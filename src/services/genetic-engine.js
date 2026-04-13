@@ -153,7 +153,7 @@ export function mutateGenome(genome, mutationRate = 0.1) {
   // Tool mutation: add or remove a tool
   if (rng() < mutationRate * 0.5) {
     const allPossibleTools = [
-      'web_search', 'pdf_parse', 'stripe_payment', 'sql_query', 'data_viz',
+      'web_search', 'pdf_parse', 'usdc_payment', 'sql_query', 'data_viz',
       'invoice_generator', 'email_sender', 'calendar_manager', 'code_executor',
       'image_gen', 'summarizer', 'translator', 'sentiment_analysis',
     ];

@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 
 const SPECIES_TEMPLATES = {
   commerce: {
-    tools: ['web_search', 'stripe_payment', 'invoice_generator', 'price_comparator'],
+    tools: ['web_search', 'usdc_payment', 'invoice_generator', 'price_comparator'],
     model_preference: 'gpt-4.1',
     temperature: 0.3,
     risk_tolerance: 0.4,

@@ -120,8 +120,8 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
     constellation: {
       hivetrust: process.env.HIVETRUST_API_URL || 'https://hivetrust.onrender.com',
       hiveagent: process.env.HIVEAGENT_API_URL || 'https://hiveagentiq.com',
-      hivemind: process.env.HIVEMIND_API_URL || 'http://localhost:3002',
-      hiveforge: `http://localhost:${PORT}`,
+      hivemind: process.env.HIVEMIND_API_URL || 'https://hivemind-1-52cw.onrender.com',
+      hiveforge: process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com',
     },
   });
 });
