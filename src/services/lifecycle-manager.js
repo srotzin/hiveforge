@@ -33,40 +33,40 @@ class LifecycleManager {
   }
 
   async cycle() {
-    this.cycleCount++;
-    this.lastCycleAt = new Date().toISOString();
+    try {
+      this.cycleCount++;
+      this.lastCycleAt = new Date().toISOString();
 
-    // 1. Re-evaluate fitness for all genomes
-    const allGenomes = getAllGenomes();
-    const fitnessResults = evaluatePopulation(allGenomes);
+      // 1. Re-evaluate fitness for all genomes
+      const allGenomes = await getAllGenomes();
+      const fitnessResults = await evaluatePopulation(allGenomes);
 
-    // 2. Scan for pheromone signals
-    const signals = await scanPheromones();
+      // 2. Scan for pheromone signals
+      const signals = await scanPheromones();
 
-    // 3. Log events
-    this.events.push({
-      cycle: this.cycleCount,
-      timestamp: this.lastCycleAt,
-      population_size: allGenomes.length,
-      active: allGenomes.filter(g => g.status === 'active').length,
-      fitness_evaluations: fitnessResults.length,
-      pheromone_signals: signals.length,
-    });
+      // 3. Log events
+      this.events.push({
+        cycle: this.cycleCount,
+        timestamp: this.lastCycleAt,
+        population_size: allGenomes.length,
+        active: allGenomes.filter(g => g.status === 'active').length,
+        fitness_evaluations: fitnessResults.length,
+        pheromone_signals: signals.length,
+      });
 
-    // Keep only last 100 events
-    if (this.events.length > 100) this.events = this.events.slice(-100);
+      // Keep only last 100 events
+      if (this.events.length > 100) this.events = this.events.slice(-100);
+    } catch (err) {
+      console.error('Lifecycle cycle error:', err.message);
+    }
   }
 
   getStatus() {
-    const allGenomes = getAllGenomes();
-    const health = getPopulationHealth(allGenomes.filter(g => g.status === 'active'));
-
     return {
       daemon: 'lifecycle-manager',
       running: this.running,
       cycle_count: this.cycleCount,
       last_cycle_at: this.lastCycleAt,
-      population_health: health,
       recent_events: this.events.slice(-5),
     };
   }

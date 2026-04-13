@@ -7,30 +7,29 @@ const router = Router();
 /**
  * GET /v1/lineage/:genomeId — Get Full Lineage Tree
  */
-router.get('/:genomeId', requireDID, (req, res) => {
+router.get('/:genomeId', requireDID, async (req, res) => {
   const { genomeId } = req.params;
-  const lineage = getLineage(genomeId);
-  const genome = getGenome(genomeId);
+  const lineage = await getLineage(genomeId);
+  const genome = await getGenome(genomeId);
 
   if (!lineage || !genome) {
     return res.status(404).json({ success: false, error: 'Lineage not found for this genome.' });
   }
 
   // Collect ancestor details
-  const ancestors = lineage.ancestor_chain
-    .map(id => getGenome(id))
-    .filter(Boolean)
-    .map(g => ({
-      genome_id: g.genome_id,
-      name: g.name,
-      species: g.species,
-      generation: g.generation,
-      fitness_score: g.fitness_score,
-      status: g.status,
-    }));
+  const ancestorPromises = lineage.ancestor_chain.map(id => getGenome(id));
+  const ancestorGenomes = (await Promise.all(ancestorPromises)).filter(Boolean);
+  const ancestors = ancestorGenomes.map(g => ({
+    genome_id: g.genome_id,
+    name: g.name,
+    species: g.species,
+    generation: g.generation,
+    fitness_score: g.fitness_score,
+    status: g.status,
+  }));
 
   // Find descendants
-  const allGenomes = getAllGenomes();
+  const allGenomes = await getAllGenomes();
   const descendants = allGenomes
     .filter(g => g.parent_genomes.includes(genomeId))
     .map(g => ({
@@ -50,7 +49,7 @@ router.get('/:genomeId', requireDID, (req, res) => {
   // Find dominant traits across lineage
   const toolCounts = {};
   for (const g of lineageGenomes) {
-    for (const tool of g.traits.tools) {
+    for (const tool of (g.traits.tools || [])) {
       toolCounts[tool] = (toolCounts[tool] || 0) + 1;
     }
   }

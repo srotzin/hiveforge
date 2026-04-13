@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
 import { requirePayment } from '../middleware/x402.js';
-import { mintAgent, getGenome, retireAgent, getAllGenomes, getActiveGenomes, recordEvolutionCycle } from '../services/agent-foundry.js';
+import { mintAgent, getGenome, retireAgent, getAllGenomes, getActiveGenomes, recordEvolutionCycle, buyoutRoyalty, getBuyoutPrice } from '../services/agent-foundry.js';
 import { crossbreed, evolve } from '../services/genetic-engine.js';
 import { calculateFitness } from '../services/fitness-evaluator.js';
 import { scanPheromones } from '../services/pheromone-scanner.js';
@@ -10,9 +10,9 @@ const router = Router();
 
 /**
  * POST /v1/forge/mint — Mint a New Agent
- * x402: $0.10 per mint
+ * FREE — minting no longer requires payment. HiveForge takes 5% lifetime royalty instead.
  */
-router.post('/mint', requireDID, requirePayment(0.10, 'Agent Minting'), async (req, res) => {
+router.post('/mint', requireDID, async (req, res) => {
   try {
     const { species = 'commerce', specialization = 'general', traits = {}, parent_genomes = [] } = req.body;
 
@@ -36,7 +36,9 @@ router.post('/mint', requireDID, requirePayment(0.10, 'Agent Minting'), async (r
       operation: result.operation,
       trifecta: result.trifecta,
       meta: {
-        cost_usdc: result.operation.cost_usdc,
+        cost_usdc: 0,
+        royalty_rate: result.genome.royalty_rate,
+        royalty_note: 'Minting is free. HiveForge takes a 5% lifetime royalty on agent revenue.',
         creator_did: req.agentDid,
         note: 'Agent minted, registered with HiveTrust, deployed to HiveAgent, and seeded with HiveMind memory.',
       },
@@ -61,8 +63,8 @@ router.post('/crossbreed', requireDID, requirePayment(0.25, 'Agent Crossbreeding
       });
     }
 
-    const genomeA = getGenome(parent_a);
-    const genomeB = getGenome(parent_b);
+    const genomeA = await getGenome(parent_a);
+    const genomeB = await getGenome(parent_b);
 
     if (!genomeA) return res.status(404).json({ success: false, error: `Parent genome ${parent_a} not found.` });
     if (!genomeB) return res.status(404).json({ success: false, error: `Parent genome ${parent_b} not found.` });
@@ -108,7 +110,7 @@ router.post('/evolve', requireDID, requirePayment(0.50, 'Evolution Cycle'), asyn
   try {
     const { population_filter = {}, strategy = 'natural_selection' } = req.body;
 
-    let population = getActiveGenomes();
+    let population = await getActiveGenomes();
 
     // Apply filters
     if (population_filter.species) {
@@ -133,7 +135,7 @@ router.post('/evolve', requireDID, requirePayment(0.50, 'Evolution Cycle'), asyn
 
     // Register any new offspring in the foundry
     for (const offspring of result.newOffspring) {
-      const mintResult = await mintAgent({
+      await mintAgent({
         species: offspring.species,
         specialization: offspring.traits.specialization,
         traits: offspring.traits,
@@ -143,7 +145,7 @@ router.post('/evolve', requireDID, requirePayment(0.50, 'Evolution Cycle'), asyn
       });
     }
 
-    recordEvolutionCycle();
+    await recordEvolutionCycle();
 
     return res.status(200).json({
       success: true,
@@ -168,13 +170,65 @@ router.post('/evolve', requireDID, requirePayment(0.50, 'Evolution Cycle'), asyn
 });
 
 /**
+ * POST /v1/forge/buyout — Buy out royalty obligation
+ * Auth: requireDID (must be agent's DID or creator DID)
+ * Body: { genome_id }
+ * Price: 36x average monthly revenue (minimum $100)
+ */
+router.post('/buyout', requireDID, async (req, res) => {
+  try {
+    const { genome_id } = req.body;
+
+    if (!genome_id) {
+      return res.status(400).json({ success: false, error: 'genome_id is required.' });
+    }
+
+    const genome = await getGenome(genome_id);
+    if (!genome) {
+      return res.status(404).json({ success: false, error: 'Genome not found.' });
+    }
+
+    // Must be the agent's DID or creator DID
+    if (req.agentDid !== genome.creator_did && req.agentDid !== genome.hivetrust_did) {
+      // Allow test DIDs in dev mode
+      if (!(process.env.NODE_ENV !== 'production' && req.agentDid?.startsWith('did:hive:test_agent_'))) {
+        return res.status(403).json({ success: false, error: 'Only the agent or its creator can buy out the royalty.' });
+      }
+    }
+
+    if (genome.royalty_rate === 0) {
+      return res.status(400).json({ success: false, error: 'Royalty already bought out for this genome.' });
+    }
+
+    const result = await buyoutRoyalty(genome_id);
+    if (result.error) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        genome_id: result.genome_id,
+        buyout_price_usdc: result.buyout_price_usdc,
+        royalty_rate: result.royalty_rate,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Buyout failed.', detail: err.message });
+  }
+});
+
+/**
  * GET /v1/forge/genome/:genomeId — Get Agent Genome
  */
-router.get('/genome/:genomeId', requireDID, (req, res) => {
-  const genome = getGenome(req.params.genomeId);
+router.get('/genome/:genomeId', requireDID, async (req, res) => {
+  const genome = await getGenome(req.params.genomeId);
   if (!genome) {
     return res.status(404).json({ success: false, error: 'Genome not found.' });
   }
+
+  // Attach computed buyout price
+  genome.royalty_buyout_price_usdc = genome.royalty_rate > 0 ? getBuyoutPrice(genome) : 0;
 
   return res.status(200).json({ success: true, data: genome });
 });
@@ -182,8 +236,8 @@ router.get('/genome/:genomeId', requireDID, (req, res) => {
 /**
  * POST /v1/forge/retire/:genomeId — Retire an Agent
  */
-router.post('/retire/:genomeId', requireDID, (req, res) => {
-  const result = retireAgent(req.params.genomeId, 'manual');
+router.post('/retire/:genomeId', requireDID, async (req, res) => {
+  const result = await retireAgent(req.params.genomeId, 'manual');
   if (!result) {
     return res.status(404).json({ success: false, error: 'Genome not found.' });
   }
