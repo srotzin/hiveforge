@@ -1,3 +1,12 @@
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || '',
+  environment: process.env.NODE_ENV || 'development',
+  tracesSampleRate: 0.1,
+  enabled: !!process.env.SENTRY_DSN,
+});
+
 import express from 'express';
 import cors from 'cors';
 import forgeRoutes from './routes/forge.js';
@@ -9,6 +18,8 @@ import { getCensus } from './services/agent-foundry.js';
 import { getScannerStatus } from './services/pheromone-scanner.js';
 import { initDatabase, checkHealth, isPostgres } from './services/db.js';
 import { rateLimit } from './middleware/rate-limit.js';
+import { sendAlert } from './services/alerts.js';
+import { startSagaWorker } from './services/saga-orchestrator.js';
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -147,10 +158,19 @@ app.use((req, res) => {
   });
 });
 
+// ─── Sentry Error Handler ───────────────────────────────────────────
+
+Sentry.setupExpressErrorHandler(app);
+
 // ─── Structured Error Handler ────────────────────────────────────────
 
 app.use((err, req, res, _next) => {
   console.error(`[HiveForge Error] ${req.method} ${req.path}:`, err.message);
+  Sentry.captureException(err);
+  sendAlert('critical', 'HiveForge', `Unhandled error: ${err.message}`, {
+    method: req.method,
+    path: req.path,
+  });
 
   const statusCode = err.statusCode || err.status || 500;
   res.status(statusCode).json({
@@ -169,6 +189,7 @@ async function start() {
   } catch (err) {
     console.error('  Database initialization failed:', err.message);
     console.log('  Falling back to in-memory mode');
+    sendAlert('critical', 'HiveForge', 'Database connection failed', { error: err.message });
   }
 
   app.listen(PORT, () => {
@@ -183,7 +204,18 @@ async function start() {
 
     // Start the lifecycle manager
     lifecycleManager.start(120_000);
-    console.log('  Lifecycle manager started (120s interval)\n');
+    console.log('  Lifecycle manager started (120s interval)');
+
+    // Start the saga background worker
+    if (isPostgres()) {
+      startSagaWorker();
+    }
+
+    sendAlert('info', 'HiveForge', `Service started on port ${PORT}`, {
+      version: '1.0.0',
+      env: process.env.NODE_ENV || 'development',
+    });
+    console.log('');
   });
 }
 

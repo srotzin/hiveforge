@@ -5,6 +5,9 @@ import { mintAgent, getGenome, retireAgent, getAllGenomes, getActiveGenomes, rec
 import { crossbreed, evolve } from '../services/genetic-engine.js';
 import { calculateFitness } from '../services/fitness-evaluator.js';
 import { scanPheromones } from '../services/pheromone-scanner.js';
+import { createSaga, advanceSaga, completeSaga } from '../services/saga-orchestrator.js';
+import { sendAlert } from '../services/alerts.js';
+import { isPostgres } from '../services/db.js';
 
 const router = Router();
 
@@ -29,12 +32,44 @@ router.post('/mint', requireDID, async (req, res) => {
       return res.status(400).json({ success: false, error: result.error });
     }
 
+    // Create and advance the agent_birth saga
+    let sagaId = null;
+    if (isPostgres()) {
+      try {
+        sagaId = await createSaga('agent_birth', {
+          genome_id: result.genome.genome_id,
+          creator_did: req.agentDid,
+        });
+        await advanceSaga(sagaId, 'forge_mint', { genome_id: result.genome.genome_id });
+
+        if (result.trifecta?.hivetrust?.did) {
+          await advanceSaga(sagaId, 'trust_register', { did: result.trifecta.hivetrust.did });
+        }
+        if (result.trifecta?.hivemind?.memory_nodes) {
+          await advanceSaga(sagaId, 'mind_seed', { memory_nodes: result.trifecta.hivemind.memory_nodes });
+        }
+        if (result.trifecta?.hiveagent?.listing_id) {
+          await advanceSaga(sagaId, 'agent_list', { listing_id: result.trifecta.hiveagent.listing_id });
+          await completeSaga(sagaId);
+        }
+      } catch (sagaErr) {
+        console.error('[Saga] Failed to track agent_birth saga:', sagaErr.message);
+      }
+    }
+
+    sendAlert('info', 'HiveForge', `Agent minted: ${result.genome.genome_id}`, {
+      species: result.genome.species,
+      creator: req.agentDid,
+      saga_id: sagaId || 'n/a',
+    });
+
     return res.status(201).json({
       success: true,
       data: result.genome,
       lineage: result.lineage,
       operation: result.operation,
       trifecta: result.trifecta,
+      saga_id: sagaId,
       meta: {
         cost_usdc: 0,
         royalty_rate: result.genome.royalty_rate,
