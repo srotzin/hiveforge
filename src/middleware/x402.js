@@ -3,6 +3,12 @@ const HIVE_PAYMENT_ADDRESS = process.env.HIVE_PAYMENT_ADDRESS || '0x742d35Cc6634
 /**
  * x402 Payment Required middleware for forge operations.
  * Consistent pattern with HiveTrust and HiveMind.
+ *
+ * Updated pricing:
+ *   /v1/forge/mint     — FREE (royalty model replaces upfront fee)
+ *   /v1/forge/crossbreed — $0.25
+ *   /v1/forge/evolve    — $0.50
+ *   /v1/forge/buyout    — dynamic (36x monthly revenue)
  */
 export function requirePayment(priceUsdc, serviceName = 'HiveForge Operation') {
   return (req, res, next) => {

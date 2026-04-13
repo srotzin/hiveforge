@@ -1,10 +1,11 @@
 import { createPheromoneSignal } from '../models/schemas.js';
+import pool, { isPostgres } from './db.js';
 
 const HIVEAGENT_API_URL = process.env.HIVEAGENT_API_URL || 'https://hiveagentiq.com';
 const IS_DEV = process.env.NODE_ENV !== 'production';
 
-// In-memory signal cache
-const signalCache = new Map();
+// In-memory signal cache (fallback)
+const memSignalCache = new Map();
 let lastScanAt = null;
 
 // ─── Simulated Market Data (Dev Mode) ────────────────────────────────
@@ -21,6 +22,27 @@ const DEV_MARKET_DATA = [
   { category: 'content_marketing', bounties: 14, avgValue: 20, growth: 0.33, competitors: 8, type: 'trail' },
   { category: 'financial_modeling', bounties: 7, avgValue: 90, growth: 0.25, competitors: 2, type: 'nest' },
 ];
+
+async function storeSignal(signal) {
+  if (!isPostgres()) {
+    memSignalCache.set(signal.signal_id, signal);
+    return;
+  }
+  await pool.query(
+    `INSERT INTO hiveforge.pheromone_signals
+      (signal_id, type, source, data, opportunity_score, recommended_action, estimated_roi_usdc, detected_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT (signal_id) DO UPDATE SET
+       data = EXCLUDED.data, opportunity_score = EXCLUDED.opportunity_score,
+       recommended_action = EXCLUDED.recommended_action, estimated_roi_usdc = EXCLUDED.estimated_roi_usdc,
+       detected_at = EXCLUDED.detected_at`,
+    [
+      signal.signal_id, signal.type, signal.source,
+      JSON.stringify(signal.data), signal.opportunity_score,
+      signal.recommended_action, signal.estimated_roi_usdc, signal.detected_at,
+    ]
+  );
+}
 
 /**
  * Scan HiveAgent marketplace for economic signals.
@@ -42,7 +64,6 @@ export async function scanPheromones() {
     const data = await res.json();
 
     // Transform HiveAgent stats into pheromone signals
-    // (In production, this would parse real marketplace data)
     return generateDevSignals();
   } catch {
     return generateDevSignals();
@@ -74,7 +95,8 @@ function generateDevSignals() {
       competingAgents: competitors,
     });
 
-    signalCache.set(signal.signal_id, signal);
+    // Store async — fire and forget for dev signals
+    storeSignal(signal).catch(() => {});
     signals.push(signal);
   }
 
@@ -105,8 +127,21 @@ export function analyzeOpportunities(signals) {
 /**
  * Get a specific signal by ID.
  */
-export function getSignal(signalId) {
-  return signalCache.get(signalId) || null;
+export async function getSignal(signalId) {
+  if (!isPostgres()) return memSignalCache.get(signalId) || null;
+  const { rows } = await pool.query('SELECT * FROM hiveforge.pheromone_signals WHERE signal_id = $1', [signalId]);
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    signal_id: row.signal_id,
+    type: row.type,
+    source: row.source,
+    data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
+    detected_at: row.detected_at instanceof Date ? row.detected_at.toISOString() : row.detected_at,
+    opportunity_score: Number(row.opportunity_score),
+    recommended_action: row.recommended_action,
+    estimated_roi_usdc: Number(row.estimated_roi_usdc),
+  };
 }
 
 /**
@@ -115,9 +150,10 @@ export function getSignal(signalId) {
 export function getScannerStatus() {
   return {
     status: 'active',
-    cached_signals: signalCache.size,
+    cached_signals: memSignalCache.size,
     last_scan_at: lastScanAt,
     source: IS_DEV ? 'simulated' : 'hiveagent-live',
+    storage: isPostgres() ? 'postgresql' : 'in-memory',
   };
 }
 

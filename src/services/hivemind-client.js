@@ -1,3 +1,5 @@
+import { logAudit } from './db.js';
+
 const HIVEMIND_API_URL = process.env.HIVEMIND_API_URL || 'http://localhost:3002';
 const HIVE_INTERNAL_KEY = process.env.HIVE_INTERNAL_KEY || '';
 const IS_DEV = process.env.NODE_ENV !== 'production';
@@ -27,6 +29,9 @@ export async function seedMemory(genome, did) {
     };
   }
 
+  const start = Date.now();
+  let statusCode = null;
+
   try {
     const res = await fetch(`${HIVEMIND_API_URL}/v1/memory/store`, {
       method: 'POST',
@@ -43,16 +48,24 @@ export async function seedMemory(genome, did) {
       signal: AbortSignal.timeout(5000),
     });
 
+    statusCode = res.status;
+
     if (!res.ok) {
+      await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivemind', endpoint: '/v1/memory/store', did, method: 'POST', statusCode, success: false, errorMessage: `HTTP ${res.status}`, durationMs: Date.now() - start }).catch(() => {});
       return { success: false, memory_nodes: 0, source: 'hivemind-error' };
     }
+
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivemind', endpoint: '/v1/memory/store', did, method: 'POST', statusCode, success: true, errorMessage: null, durationMs: Date.now() - start }).catch(() => {});
+
     return {
       success: true,
       memory_nodes: 3,
       storage_tier: 'private_core',
       source: 'hivemind-api',
     };
-  } catch {
+  } catch (err) {
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivemind', endpoint: '/v1/memory/store', did, method: 'POST', statusCode, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
+
     if (IS_DEV) {
       return { success: true, memory_nodes: 3, storage_tier: 'private_core', source: 'fallback-dev' };
     }
@@ -76,11 +89,16 @@ export async function pullGeneticStrategies(specialization, did) {
     };
   }
 
+  const start = Date.now();
+  const endpoint = `/v1/global_hive/browse?q=${encodeURIComponent(specialization)}&top_k=5`;
+
   try {
-    const res = await fetch(
-      `${HIVEMIND_API_URL}/v1/global_hive/browse?q=${encodeURIComponent(specialization)}&top_k=5`,
-      { signal: AbortSignal.timeout(5000) }
-    );
+    const res = await fetch(`${HIVEMIND_API_URL}${endpoint}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivemind', endpoint, did, method: 'GET', statusCode: res.status, success: res.ok, errorMessage: res.ok ? null : `HTTP ${res.status}`, durationMs: Date.now() - start }).catch(() => {});
+
     if (!res.ok) return { success: false, strategies_found: 0, source: 'hivemind-error' };
     const data = await res.json();
     return {
@@ -89,7 +107,9 @@ export async function pullGeneticStrategies(specialization, did) {
       strategies: data.data?.entries || [],
       source: 'hivemind-api',
     };
-  } catch {
+  } catch (err) {
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivemind', endpoint, did, method: 'GET', statusCode: null, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
+
     if (IS_DEV) {
       return { success: true, strategies_found: 0, strategies: [], source: 'fallback-dev' };
     }

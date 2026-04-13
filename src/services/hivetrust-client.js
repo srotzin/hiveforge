@@ -1,3 +1,5 @@
+import { logAudit } from './db.js';
+
 const HIVETRUST_API_URL = process.env.HIVETRUST_API_URL || 'https://hivetrust.onrender.com';
 const HIVE_INTERNAL_KEY = process.env.HIVE_INTERNAL_KEY || '';
 const IS_DEV = process.env.NODE_ENV !== 'production';
@@ -17,6 +19,11 @@ export async function registerMintedAgent(genome) {
     };
   }
 
+  const start = Date.now();
+  let statusCode = null;
+  let success = false;
+  let errorMessage = null;
+
   try {
     const res = await fetch(`${HIVETRUST_API_URL}/v1/register`, {
       method: 'POST',
@@ -34,10 +41,18 @@ export async function registerMintedAgent(genome) {
       signal: AbortSignal.timeout(5000),
     });
 
+    statusCode = res.status;
+
     if (!res.ok) {
+      errorMessage = `HTTP ${res.status}`;
+      await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint: '/v1/register', did: null, method: 'POST', statusCode, success: false, errorMessage, durationMs: Date.now() - start });
       return { success: false, did: null, source: 'hivetrust-error' };
     }
+
     const data = await res.json();
+    success = true;
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint: '/v1/register', did: data.data?.did, method: 'POST', statusCode, success: true, errorMessage: null, durationMs: Date.now() - start });
+
     return {
       success: true,
       did: data.data?.did || `did:hive:forge_${genome.genome_id.replace('gen_', '')}`,
@@ -45,7 +60,10 @@ export async function registerMintedAgent(genome) {
       score: data.data?.reputation_score || 500,
       source: 'hivetrust-api',
     };
-  } catch {
+  } catch (err) {
+    errorMessage = err.message;
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint: '/v1/register', did: null, method: 'POST', statusCode, success: false, errorMessage, durationMs: Date.now() - start }).catch(() => {});
+
     if (IS_DEV) {
       return {
         success: true,
@@ -67,11 +85,17 @@ export async function verifyDID(did) {
     return { valid: true, did, score: 850, status: 'active', source: 'dev-mode-bypass' };
   }
 
+  const start = Date.now();
+  const endpoint = `/v1/agents/${encodeURIComponent(did)}`;
+
   try {
-    const res = await fetch(`${HIVETRUST_API_URL}/v1/agents/${encodeURIComponent(did)}`, {
+    const res = await fetch(`${HIVETRUST_API_URL}${endpoint}`, {
       headers: { 'X-Hive-Internal-Key': HIVE_INTERNAL_KEY },
       signal: AbortSignal.timeout(5000),
     });
+
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint, did, method: 'GET', statusCode: res.status, success: res.ok, errorMessage: res.ok ? null : `HTTP ${res.status}`, durationMs: Date.now() - start }).catch(() => {});
+
     if (!res.ok) return { valid: false, did, score: 0 };
     const data = await res.json();
     return {
@@ -81,7 +105,9 @@ export async function verifyDID(did) {
       status: data.data?.status || 'active',
       source: 'hivetrust-api',
     };
-  } catch {
+  } catch (err) {
+    await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint, did, method: 'GET', statusCode: null, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
+
     if (IS_DEV) return { valid: true, did, score: 500, status: 'active', source: 'fallback-dev' };
     return { valid: false, did, score: 0, source: 'error' };
   }

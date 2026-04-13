@@ -87,6 +87,9 @@ export function createAgentGenome({
     hivetrust_did: null,
     hiveagent_listing_id: null,
     hivemind_memory_nodes: 0,
+    royalty_rate: 0.05,
+    royalty_buyout_price_usdc: null,
+    total_royalties_earned_usdc: 0,
   };
 }
 

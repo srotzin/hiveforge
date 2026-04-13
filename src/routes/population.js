@@ -9,8 +9,8 @@ const router = Router();
  * GET /v1/population/census — Population Census
  * Public endpoint (no auth required)
  */
-router.get('/census', (req, res) => {
-  const census = getCensus();
+router.get('/census', async (req, res) => {
+  const census = await getCensus();
 
   return res.status(200).json({
     success: true,
@@ -22,10 +22,11 @@ router.get('/census', (req, res) => {
  * GET /v1/population/health — Population Health Metrics
  * Public endpoint (no auth required)
  */
-router.get('/health', (req, res) => {
-  const allGenomes = getAllGenomes();
+router.get('/health', async (req, res) => {
+  const allGenomes = await getAllGenomes();
   const active = allGenomes.filter(g => g.status === 'active');
   const health = getPopulationHealth(active);
+  const evolutionCycles = await getEvolutionCycles();
 
   return res.status(200).json({
     success: true,
@@ -33,7 +34,7 @@ router.get('/health', (req, res) => {
       ...health,
       total_population: allGenomes.length,
       active_agents: active.length,
-      evolution_cycles_total: getEvolutionCycles(),
+      evolution_cycles_total: evolutionCycles,
       lifecycle_manager: lifecycleManager.getStatus(),
     },
   });

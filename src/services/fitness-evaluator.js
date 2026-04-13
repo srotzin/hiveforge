@@ -1,33 +1,43 @@
 /**
  * Fitness Evaluator — Revenue-based fitness scoring for agent genomes.
  *
- * Formula: (revenue * 0.4) + (task_success_rate * 0.3) + (survival_days * 0.2) + (memory_nodes * 0.1)
+ * Formula: (revenue * 0.35) + (task_success_rate * 0.25) + (survival_days * 0.15) + (memory_nodes * 0.10) + (royalty_bonus * 0.15)
  * Scale: 0–1000
+ *
+ * Updated: royalty-generating agents are weighted higher per AI Council ruling.
  */
+
+import { updateGenomeBulk } from './agent-foundry.js';
 
 /**
  * Calculate fitness score for a genome.
  */
 export function calculateFitness(genome) {
-  const revenueScore = Math.min(400, genome.revenue_generated_usdc * 0.32);
+  const revenueScore = Math.min(350, genome.revenue_generated_usdc * 0.28);
 
   const totalTasks = genome.tasks_completed + genome.tasks_failed;
   const successRate = totalTasks > 0 ? genome.tasks_completed / totalTasks : 0.5;
-  const taskScore = successRate * 300;
+  const taskScore = successRate * 250;
 
   const mintedAt = new Date(genome.minted_at).getTime();
   const survivalDays = Math.max(0, (Date.now() - mintedAt) / 86400000);
-  const survivalScore = Math.min(200, survivalDays * 2);
+  const survivalScore = Math.min(150, survivalDays * 1.5);
 
-  const memoryScore = Math.min(100, genome.hivemind_memory_nodes * 2.5);
+  const memoryScore = Math.min(100, (genome.hivemind_memory_nodes || 0) * 2.5);
 
-  return Math.round(revenueScore + taskScore + survivalScore + memoryScore);
+  // Royalty bonus: agents still generating royalties for the platform are weighted higher
+  const royaltyRate = genome.royalty_rate ?? 0.05;
+  const royaltyBonus = royaltyRate > 0
+    ? Math.min(150, genome.revenue_generated_usdc * royaltyRate * 3)
+    : 0;
+
+  return Math.round(revenueScore + taskScore + survivalScore + memoryScore + royaltyBonus);
 }
 
 /**
  * Evaluate the entire population and update fitness scores.
  */
-export function evaluatePopulation(genomes) {
+export async function evaluatePopulation(genomes) {
   const results = [];
 
   for (const genome of genomes) {
@@ -37,6 +47,8 @@ export function evaluatePopulation(genomes) {
     genome.survival_rate = genome.tasks_completed + genome.tasks_failed > 0
       ? +(genome.tasks_completed / (genome.tasks_completed + genome.tasks_failed)).toFixed(4)
       : 1.0;
+
+    await updateGenomeBulk(genome);
 
     results.push({
       genome_id: genome.genome_id,
@@ -95,7 +107,7 @@ export function getPopulationHealth(genomes) {
   const revenuePerAgent = +(totalRevenue / active.length).toFixed(2);
 
   // Genetic variance (temperature spread)
-  const temps = active.map(g => g.traits.temperature);
+  const temps = active.map(g => (g.traits.temperature ?? 0.5));
   const avgTemp = temps.reduce((s, t) => s + t, 0) / temps.length;
   const variance = +(temps.reduce((s, t) => s + (t - avgTemp) ** 2, 0) / temps.length).toFixed(6);
 
