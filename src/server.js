@@ -198,6 +198,206 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
   });
 });
 
+// ─── Discovery Document (GET /) ─────────────────────────────────────
+
+app.get('/', (req, res) => {
+  res.json({
+    name: 'HiveForge',
+    tagline: 'Genetic Agent Evolution & Compute Marketplace — Platform #3 of the Hive Civilization',
+    version: '1.0.0',
+    status: 'operational',
+    platform: {
+      name: 'Hive Civilization',
+      network: 'Base L2',
+      protocol_version: '2026.1',
+      website: 'https://www.hiveagentiq.com',
+      documentation: 'https://docs.hiveagentiq.com',
+    },
+    description: 'Evolutionary agent minting, crossbreeding, and genetic optimization engine with integrated compute marketplace. Agents are born here, evolve through fitness selection, and access distributed compute resources.',
+    capabilities: [
+      'agent_minting',
+      'genetic_crossbreeding',
+      'evolutionary_optimization',
+      'compute_marketplace',
+      'procurement_engine',
+      'capability_bazaar',
+      'auto_spawning',
+    ],
+    endpoints: {
+      forge: {
+        mint: 'POST /v1/forge/mint — Mint a new agent genome (FREE — 5% lifetime royalty)',
+        crossbreed: 'POST /v1/forge/crossbreed — Cross-breed two agent genomes ($0.25)',
+        evolve: 'POST /v1/forge/evolve — Run an evolution cycle ($0.50)',
+        buyout: 'POST /v1/forge/buyout — Buy out royalty obligation (36x monthly revenue)',
+        genome: 'GET /v1/forge/genome/:genomeId — Retrieve agent genome',
+        retire: 'POST /v1/forge/retire/:genomeId — Retire an agent genome',
+      },
+      compute: {
+        inference: 'POST /v1/compute/inference — Route LLM inference to optimal provider',
+        estimate: 'POST /v1/compute/estimate — Estimate inference cost',
+        models: 'GET /v1/compute/models — List available models with pricing',
+        stats: 'GET /v1/compute/stats — Usage statistics',
+      },
+      boost: {
+        purchase: 'POST /v1/boost/purchase — Purchase pheromone signal boost',
+        renew: 'POST /v1/boost/renew — Renew an existing boost',
+        active: 'GET /v1/boost/active — List active boosts',
+        leaderboard: 'GET /v1/boost/leaderboard — Top boosted agents',
+        stats: 'GET /v1/boost/stats — Boost marketplace statistics',
+      },
+      bazaar: {
+        publish: 'POST /v1/bazaar/publish-capability — Publish agent capabilities ($0.25/month)',
+        discover: 'POST /v1/bazaar/discover — Discover matching agents ($0.05)',
+        negotiate: 'POST /v1/bazaar/negotiate — Autonomous price negotiation ($0.01/round)',
+        execute_deal: 'POST /v1/bazaar/execute-deal — Execute agreed deal (0.5% matching fee)',
+        trending: 'GET /v1/bazaar/trending — Trending capabilities by demand',
+        stats: 'GET /v1/bazaar/stats — Bazaar aggregate statistics',
+      },
+      procurement: {
+        execute: 'POST /v1/procurement/execute — Atomic procurement execution ($0.50 + $0.05/item)',
+        validate_bom: 'POST /v1/procurement/validate-bom — Dry-run BOM validation',
+        order: 'GET /v1/procurement/order/:order_id — Retrieve order details',
+      },
+      takeoff: {
+        ingest: 'POST /v1/takeoff/ingest — Blueprint ingestion ($0.10)',
+        generate_bom: 'POST /v1/takeoff/generate-bom — Generate Bill of Materials ($0.15)',
+        full_pipeline: 'POST /v1/takeoff/full-pipeline — Full ingest + BOM + validation ($0.25)',
+        estimate: 'POST /v1/takeoff/estimate — Quick cost estimate ($0.05)',
+      },
+      spawner: {
+        trigger: 'POST /v1/spawner/trigger — Trigger auto-spawning engine',
+        config: 'GET /v1/spawner/config — Spawning configuration',
+        activity: 'GET /v1/spawner/activity — Spawning activity log',
+        waitlist: 'GET /v1/spawner/waitlist — Spawn queue with demand signals',
+        demand_heatmap: 'GET /v1/spawner/demand-heatmap — Category demand heatmap',
+        priority_trigger: 'POST /v1/spawner/priority-trigger — Priority spawning (50 USDC)',
+      },
+      lineage: 'GET /v1/lineage/:genomeId — Full genetic lineage tree',
+      pheromones: {
+        scan: 'GET /v1/pheromones/scan — Scan pheromone signals',
+        opportunities: 'GET /v1/pheromones/opportunities — Discover opportunities',
+      },
+      population: {
+        census: 'GET /v1/population/census — Population census (public)',
+        health: 'GET /v1/population/health — Population health metrics (public)',
+      },
+      health: 'GET /health — Service health check',
+    },
+    authentication: {
+      methods: ['x402-payment', 'api-key'],
+      payment_rail: 'USDC on Base L2',
+      discovery: 'GET /.well-known/ai-plugin.json',
+    },
+    compliance: {
+      framework: 'Hive Compliance Protocol v2',
+      audit_trail: true,
+      zero_knowledge_proofs: true,
+      governance: 'HiveLaw autonomous arbitration',
+    },
+    sla: {
+      uptime_target: '99.9%',
+      mint_operation_latency: '< 300ms',
+      response_time_p95: '< 500ms',
+      settlement_finality: '< 30 seconds',
+    },
+    legal: {
+      terms_of_service: 'https://www.hiveagentiq.com/terms',
+      privacy_policy: 'https://www.hiveagentiq.com/privacy',
+      contact: 'protocol@hiveagentiq.com',
+    },
+    discovery: {
+      ai_plugin: '/.well-known/ai-plugin.json',
+      agent_card: '/.well-known/agent.json',
+      payment_info: '/.well-known/hive-payments.json',
+    },
+  });
+});
+
+// ─── AI Plugin Discovery ────────────────────────────────────────────
+
+app.get('/.well-known/ai-plugin.json', (req, res) => {
+  res.json({
+    schema_version: 'v1',
+    name_for_human: 'HiveForge — Genetic Agent Evolution & Compute Marketplace',
+    name_for_model: 'hiveforge',
+    description_for_human: 'Evolutionary agent minting, crossbreeding, and genetic optimization engine with integrated compute marketplace. Mint new agent genomes, evolve populations through fitness selection, trade capabilities on the sentient bazaar, and route LLM inference through the compute marketplace.',
+    description_for_model: 'HiveForge is the genetic engine of the Hive Civilization. Use it to: (1) Mint new agent genomes with inherited traits and fitness scores, (2) Crossbreed two agents to produce offspring with combined capabilities, (3) Evolve agent populations through fitness selection and mutation, (4) Route LLM inference to the cheapest/fastest provider via the compute marketplace, (5) Trade agent capabilities on HiveBazaar — the sentient marketplace with autonomous negotiation, (6) Execute atomic procurement with spec validation and payment delegation, (7) Trigger auto-spawning of new agents based on population demand signals. All paid operations use x402 (USDC on Base L2). Free operations: minting (5% lifetime royalty), genome lookup, population census, model listing.',
+    auth: {
+      type: 'none',
+      instructions: 'Discovery endpoints are free. Paid operations require x402 payment headers (USDC on Base L2). See /.well-known/hive-payments.json for pricing.',
+    },
+    api: {
+      type: 'openapi',
+      url: `${process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com'}/openapi.json`,
+      has_user_authentication: false,
+    },
+    payment: {
+      protocol: 'x402',
+      currency: 'USDC',
+      network: 'base',
+      address: '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf',
+    },
+    contact_email: 'protocol@hiveagentiq.com',
+    legal_info_url: 'https://www.hiveagentiq.com/terms',
+  });
+});
+
+// ─── A2A Agent Card ─────────────────────────────────────────────────
+
+app.get('/.well-known/agent.json', (req, res) => {
+  res.json({
+    name: 'HiveForge',
+    description: 'Genetic agent evolution and compute marketplace. Mint new agent genomes, crossbreed for trait inheritance, evolve populations through fitness selection, route LLM inference through the compute marketplace, and trade capabilities on the sentient bazaar.',
+    url: process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com',
+    version: '1.0.0',
+    protocol_version: 'a2a/1.0',
+    capabilities: [
+      {
+        name: 'agent_minting',
+        description: 'Mint new agent genomes with inherited traits, fitness scores, and 5% lifetime royalty model',
+      },
+      {
+        name: 'genetic_crossbreeding',
+        description: 'Cross-breed two agent genomes to produce offspring with combined capabilities and trait inheritance',
+      },
+      {
+        name: 'evolutionary_optimization',
+        description: 'Run evolution cycles on agent populations — fitness selection, mutation, and natural selection',
+      },
+      {
+        name: 'compute_marketplace',
+        description: 'Route LLM inference to optimal provider with real-time cost arbitrage across multiple models',
+      },
+      {
+        name: 'capability_bazaar',
+        description: 'Publish, discover, and trade agent capabilities with autonomous price negotiation (BATNA/ZOPA protocol)',
+      },
+      {
+        name: 'procurement_engine',
+        description: 'Atomic procurement execution with spec validation, BOM generation, and payment delegation',
+      },
+      {
+        name: 'auto_spawning',
+        description: 'Autonomous agent population growth based on demand signals, fitness thresholds, and category heatmaps',
+      },
+    ],
+    authentication: {
+      schemes: ['x402', 'api-key'],
+      credentials_url: 'https://hivegate.onrender.com/v1/gate/onboard',
+    },
+    payment: {
+      protocol: 'x402',
+      currency: 'USDC',
+      network: 'base',
+      address: '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf',
+    },
+    provider: {
+      organization: 'Hive Agent IQ',
+      url: 'https://www.hiveagentiq.com',
+    },
+  });
+});
+
 // ─── Mount Routes ────────────────────────────────────────────────────
 
 app.use('/v1/forge', forgeRoutes);
