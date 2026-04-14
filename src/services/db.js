@@ -21,6 +21,25 @@ export async function initDatabase() {
 
   const client = await pool.connect();
   try {
+    // Migrate: expand species constraint if it exists with old values
+    try {
+      await client.query(`
+        ALTER TABLE hiveforge.genomes DROP CONSTRAINT IF EXISTS genomes_species_check;
+        ALTER TABLE hiveforge.genomes ADD CONSTRAINT genomes_species_check
+          CHECK (species IN (
+            'commerce', 'analytics', 'compliance', 'creative', 'research',
+            'intelligence', 'security', 'finance', 'industrial', 'justice',
+            'population', 'knowledge', 'engineering', 'healthcare', 'education',
+            'logistics', 'energy', 'media', 'governance'
+          ));
+      `);
+    } catch (migErr) {
+      // Table may not exist yet on first run — that's fine
+      if (!migErr.message.includes('does not exist')) {
+        console.warn('[Migration] species constraint update:', migErr.message);
+      }
+    }
+
     await client.query(`
       CREATE SCHEMA IF NOT EXISTS hiveforge;
 
@@ -61,7 +80,12 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS hiveforge.genomes (
         genome_id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        species TEXT NOT NULL CHECK (species IN ('commerce', 'analytics', 'compliance', 'creative', 'research')),
+        species TEXT NOT NULL CHECK (species IN (
+          'commerce', 'analytics', 'compliance', 'creative', 'research',
+          'intelligence', 'security', 'finance', 'industrial', 'justice',
+          'population', 'knowledge', 'engineering', 'healthcare', 'education',
+          'logistics', 'energy', 'media', 'governance'
+        )),
         generation INTEGER DEFAULT 1,
         parent_genomes TEXT[] DEFAULT '{}',
         traits JSONB NOT NULL DEFAULT '{}',

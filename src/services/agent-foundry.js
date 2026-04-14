@@ -165,8 +165,10 @@ function rowToLineage(row) {
 // ─── Mint ────────────────────────────────────────────────────────────
 
 export async function mintAgent({
+  name,
   species = 'commerce',
   specialization = 'general',
+  description,
   traits = {},
   parentGenomes = [],
   creatorDid,
@@ -186,10 +188,13 @@ export async function mintAgent({
     genome = result.offspring;
     mutations = result.mutations;
     genome.creator_did = creatorDid;
+    if (name) genome.name = name;
   } else {
     genome = createAgentGenome({
+      name,
       species,
       specialization,
+      description,
       traits,
       parentGenomes,
       creatorDid,

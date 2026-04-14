@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 // ─── Species Templates ──────────────────────────────────────────────
 
 const SPECIES_TEMPLATES = {
+  // ─── Core 5 (original) ─────────────────────────────────────────────
   commerce: {
     tools: ['web_search', 'usdc_payment', 'invoice_generator', 'price_comparator'],
     model_preference: 'gpt-4.1',
@@ -34,9 +35,97 @@ const SPECIES_TEMPLATES = {
     temperature: 0.4,
     risk_tolerance: 0.3,
   },
+  // ─── Extended Species (full agent economy) ─────────────────────────
+  intelligence: {
+    tools: ['web_search', 'data_viz', 'statistical_analysis', 'summarizer'],
+    model_preference: 'claude-sonnet-4-6',
+    temperature: 0.2,
+    risk_tolerance: 0.3,
+  },
+  security: {
+    tools: ['risk_assessment', 'audit_trail', 'web_search', 'regulation_lookup'],
+    model_preference: 'gpt-4.1',
+    temperature: 0.1,
+    risk_tolerance: 0.05,
+  },
+  finance: {
+    tools: ['usdc_payment', 'price_comparator', 'data_viz', 'invoice_generator'],
+    model_preference: 'gpt-4.1',
+    temperature: 0.2,
+    risk_tolerance: 0.3,
+  },
+  industrial: {
+    tools: ['web_search', 'document_parser', 'invoice_generator', 'price_comparator'],
+    model_preference: 'gpt-4.1',
+    temperature: 0.2,
+    risk_tolerance: 0.2,
+  },
+  justice: {
+    tools: ['regulation_lookup', 'document_parser', 'risk_assessment', 'audit_trail'],
+    model_preference: 'gpt-4.1',
+    temperature: 0.1,
+    risk_tolerance: 0.05,
+  },
+  population: {
+    tools: ['web_search', 'summarizer', 'data_viz', 'social_scheduler'],
+    model_preference: 'claude-sonnet-4-6',
+    temperature: 0.5,
+    risk_tolerance: 0.4,
+  },
+  knowledge: {
+    tools: ['web_search', 'pdf_parse', 'citation_manager', 'summarizer'],
+    model_preference: 'claude-sonnet-4-6',
+    temperature: 0.3,
+    risk_tolerance: 0.2,
+  },
+  engineering: {
+    tools: ['sql_query', 'data_viz', 'document_parser', 'web_search'],
+    model_preference: 'claude-sonnet-4-6',
+    temperature: 0.2,
+    risk_tolerance: 0.2,
+  },
+  healthcare: {
+    tools: ['document_parser', 'risk_assessment', 'summarizer', 'web_search'],
+    model_preference: 'gpt-4.1',
+    temperature: 0.1,
+    risk_tolerance: 0.1,
+  },
+  education: {
+    tools: ['web_search', 'summarizer', 'pdf_parse', 'citation_manager'],
+    model_preference: 'claude-sonnet-4-6',
+    temperature: 0.5,
+    risk_tolerance: 0.3,
+  },
+  logistics: {
+    tools: ['web_search', 'data_viz', 'price_comparator', 'invoice_generator'],
+    model_preference: 'gpt-4.1',
+    temperature: 0.2,
+    risk_tolerance: 0.3,
+  },
+  energy: {
+    tools: ['data_viz', 'statistical_analysis', 'web_search', 'price_comparator'],
+    model_preference: 'claude-sonnet-4-6',
+    temperature: 0.2,
+    risk_tolerance: 0.3,
+  },
+  media: {
+    tools: ['image_gen', 'copywriter', 'social_scheduler', 'web_search'],
+    model_preference: 'claude-opus-4-6',
+    temperature: 0.7,
+    risk_tolerance: 0.5,
+  },
+  governance: {
+    tools: ['regulation_lookup', 'audit_trail', 'document_parser', 'risk_assessment'],
+    model_preference: 'gpt-4.1',
+    temperature: 0.1,
+    risk_tolerance: 0.1,
+  },
 };
 
-export { SPECIES_TEMPLATES };
+/** All valid species names — used for validation */
+const VALID_SPECIES = Object.keys(SPECIES_TEMPLATES);
+
+export { SPECIES_TEMPLATES, VALID_SPECIES };
 
 // ─── AgentGenome ─────────────────────────────────────────────────────
 
@@ -47,13 +136,16 @@ export function createAgentGenome({
   parentGenomes = [],
   traits = {},
   specialization = 'general',
+  description = null,
   creatorDid = null,
 }) {
+  // Accept any species that has a template; fall back to commerce for unknown
   const template = SPECIES_TEMPLATES[species] || SPECIES_TEMPLATES.commerce;
   const now = new Date().toISOString();
   const genomeId = `gen_${uuidv4().replace(/-/g, '').substring(0, 12)}`;
 
-  const systemPrompt = `You are a ${species} agent specializing in ${specialization}. Execute tasks precisely and report results.`;
+  const systemPrompt = description
+    || `You are a ${species} agent specializing in ${specialization}. Execute tasks precisely and report results.`;
   const promptHash = `sha256:${crypto.createHash('sha256').update(systemPrompt).digest('hex').substring(0, 16)}`;
 
   return {

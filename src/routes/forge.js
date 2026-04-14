@@ -17,11 +17,13 @@ const router = Router();
  */
 router.post('/mint', requireDID, async (req, res) => {
   try {
-    const { species = 'commerce', specialization = 'general', traits = {}, parent_genomes = [] } = req.body;
+    const { name, species = 'commerce', specialization = 'general', description, traits = {}, parent_genomes = [] } = req.body;
 
     const result = await mintAgent({
+      name,
       species,
       specialization,
+      description,
       traits,
       parentGenomes: parent_genomes,
       creatorDid: req.agentDid,
