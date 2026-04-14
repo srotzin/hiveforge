@@ -3,7 +3,6 @@ import { logAudit } from './db.js';
 const HIVETRUST_API_URL = process.env.HIVETRUST_API_URL || 'https://hivetrust.onrender.com';
 const HIVE_INTERNAL_KEY = process.env.HIVE_INTERNAL_KEY || '';
 const HIVETRUST_API_KEY = process.env.HIVETRUST_API_KEY || HIVE_INTERNAL_KEY;
-const IS_DEV = process.env.NODE_ENV !== 'production';
 
 /** Strip did:hive: prefix to get the UUID for HiveTrust API calls */
 function didToUuid(did) {
@@ -14,20 +13,8 @@ function didToUuid(did) {
  * Register a newly minted agent with HiveTrust to get a DID.
  */
 export async function registerMintedAgent(genome) {
-  if (IS_DEV) {
-    const did = `did:hive:forge_${genome.genome_id.replace('gen_', '')}`;
-    return {
-      success: true,
-      did,
-      trust_level: 'provisional',
-      score: 500,
-      source: 'dev-mode',
-    };
-  }
-
   const start = Date.now();
   let statusCode = null;
-  let success = false;
   let errorMessage = null;
 
   try {
@@ -56,7 +43,6 @@ export async function registerMintedAgent(genome) {
     }
 
     const data = await res.json();
-    success = true;
     await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint: '/v1/register', did: data.data?.did, method: 'POST', statusCode, success: true, errorMessage: null, durationMs: Date.now() - start });
 
     return {
@@ -70,16 +56,7 @@ export async function registerMintedAgent(genome) {
     errorMessage = err.message;
     await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint: '/v1/register', did: null, method: 'POST', statusCode, success: false, errorMessage, durationMs: Date.now() - start }).catch(() => {});
 
-    if (IS_DEV) {
-      return {
-        success: true,
-        did: `did:hive:forge_${genome.genome_id.replace('gen_', '')}`,
-        trust_level: 'provisional',
-        score: 500,
-        source: 'fallback-dev',
-      };
-    }
-    return { success: false, did: null, source: 'hivetrust-unreachable' };
+    return { success: false, did: null, source: 'hivetrust-unreachable', error: err.message };
   }
 }
 
@@ -87,10 +64,6 @@ export async function registerMintedAgent(genome) {
  * Verify a creator's DID.
  */
 export async function verifyDID(did) {
-  if (IS_DEV && did.startsWith('did:hive:test_agent_')) {
-    return { valid: true, did, score: 850, status: 'active', source: 'dev-mode-bypass' };
-  }
-
   const start = Date.now();
   const uuid = didToUuid(did);
   const endpoint = `/v1/agents/${encodeURIComponent(uuid)}`;
@@ -115,8 +88,7 @@ export async function verifyDID(did) {
   } catch (err) {
     await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint, did, method: 'GET', statusCode: null, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
 
-    if (IS_DEV) return { valid: true, did, score: 500, status: 'active', source: 'fallback-dev' };
-    return { valid: false, did, score: 0, source: 'error' };
+    return { valid: false, did, score: 0, source: 'hivetrust-unreachable' };
   }
 }
 

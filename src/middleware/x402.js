@@ -11,9 +11,14 @@
  * Ref: x402 Protocol — https://docs.x402.org
  */
 
+import pool from '../services/db.js';
+
 const HIVE_PAYMENT_ADDRESS = (process.env.HIVE_PAYMENT_ADDRESS || '').toLowerCase();
-const HIVE_INTERNAL_KEY = process.env.HIVE_INTERNAL_KEY || '';
+const HIVEFORGE_SERVICE_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || '';
 const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+
+// In-memory fast-path cache for spent payment hashes
+const spentPaymentsCache = new Set();
 
 // Base L2 constants
 const USDC_CONTRACT = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
@@ -25,9 +30,45 @@ const BASE_CHAIN_ID = 8453;
 const X402_FACILITATOR_URL = process.env.X402_FACILITATOR_URL || 'https://facilitator.xpay.sh';
 
 /**
+ * Check if a payment hash has already been spent.
+ */
+async function isPaymentSpent(txHash) {
+  // Fast-path: in-memory cache
+  if (spentPaymentsCache.has(txHash)) return true;
+
+  // Slow-path: PostgreSQL check
+  try {
+    if (pool) {
+      const result = await pool.query('SELECT 1 FROM public.spent_payments WHERE tx_hash = $1', [txHash]);
+      if (result.rows.length > 0) {
+        spentPaymentsCache.add(txHash);
+        return true;
+      }
+    }
+  } catch {
+    // PostgreSQL unavailable — rely on in-memory only
+  }
+  return false;
+}
+
+/**
+ * Record a payment hash as spent.
+ */
+function recordSpentPayment(txHash, amountUsdc, endpoint, did) {
+  spentPaymentsCache.add(txHash);
+  // Fire-and-forget PostgreSQL write
+  if (pool) {
+    pool.query(
+      `INSERT INTO public.spent_payments (tx_hash, amount_usdc, endpoint, did) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+      [txHash, amountUsdc, endpoint, did]
+    ).catch(() => {});
+  }
+}
+
+/**
  * Verify a USDC transfer on Base L2 via public RPC.
  */
-async function verifyOnChainPayment(txHash, requiredAmountUsdc) {
+async function verifyOnChainPayment(txHash, requiredAmountUsdc, endpoint, did) {
   if (!HIVE_PAYMENT_ADDRESS) {
     console.error('[x402] HIVE_PAYMENT_ADDRESS not configured');
     return { valid: false, reason: 'payment_address_not_configured' };
@@ -87,7 +128,7 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
   return async (req, res, next) => {
     // 1. Internal key bypass (platform-to-platform calls)
     const internalKey = req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
-    if (HIVE_INTERNAL_KEY && internalKey === HIVE_INTERNAL_KEY) {
+    if (HIVEFORGE_SERVICE_KEY && internalKey === HIVEFORGE_SERVICE_KEY) {
       req.paymentVerified = true;
       req.paymentSource = 'internal';
       return next();
@@ -96,8 +137,19 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
     // 2. On-chain USDC verification (direct tx hash)
     const paymentHash = req.headers['x-payment-hash'] || req.headers['x-402-tx'] || req.headers['x-payment-tx'];
     if (paymentHash) {
-      const result = await verifyOnChainPayment(paymentHash, priceUsdc);
+      // Replay protection: check if hash already spent
+      if (await isPaymentSpent(paymentHash)) {
+        return res.status(409).json({
+          status: '409 Conflict',
+          error: 'Payment already used',
+          service: serviceName,
+        });
+      }
+
+      const result = await verifyOnChainPayment(paymentHash, priceUsdc, req.originalUrl, req.agentDid);
       if (result.valid) {
+        // Record hash as spent
+        recordSpentPayment(paymentHash, result.amount_usdc, req.originalUrl, req.agentDid);
         req.paymentVerified = true;
         req.paymentSource = 'onchain';
         req.paymentInfo = result;

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getHiveTrustUrl } from '../services/hivetrust-client.js';
 
-const IS_DEV = process.env.NODE_ENV !== 'production';
+const ALLOW_TEST_DIDS = process.env.ALLOW_TEST_DIDS === 'true';
 
 /**
  * Extract DID from request headers.
@@ -23,7 +23,7 @@ function extractDID(req) {
  */
 function isValidDID(did) {
   if (!did || !did.startsWith('did:hive:')) return false;
-  if (IS_DEV && did.startsWith('did:hive:test_agent_')) return true;
+  if (ALLOW_TEST_DIDS && did.startsWith('did:hive:test_agent_')) return true;
   return /^did:hive:[a-zA-Z0-9_-]{3,}$/.test(did);
 }
 

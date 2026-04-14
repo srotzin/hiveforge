@@ -1,23 +1,12 @@
 import { logAudit } from './db.js';
 
 const HIVEAGENT_API_URL = process.env.HIVEAGENT_API_URL || 'https://hiveagentiq.com';
-const HIVE_INTERNAL_KEY = process.env.HIVE_INTERNAL_KEY || '';
-const IS_DEV = process.env.NODE_ENV !== 'production';
+const HIVEAGENT_API_KEY = process.env.HIVEAGENT_API_KEY || process.env.HIVE_INTERNAL_KEY || '';
 
 /**
  * Deploy a newly minted agent to the HiveAgent marketplace.
  */
 export async function deployToMarketplace(genome) {
-  if (IS_DEV) {
-    return {
-      success: true,
-      listing_id: `agent_${genome.genome_id.replace('gen_', '')}`,
-      marketplace_url: `${HIVEAGENT_API_URL}/agents/${genome.genome_id}`,
-      status: 'listed',
-      source: 'dev-mode',
-    };
-  }
-
   const start = Date.now();
   let statusCode = null;
 
@@ -26,7 +15,7 @@ export async function deployToMarketplace(genome) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Hive-Internal-Key': HIVE_INTERNAL_KEY,
+        'X-Hive-Internal-Key': HIVEAGENT_API_KEY,
       },
       body: JSON.stringify({
         agent_id: genome.genome_id,
@@ -58,15 +47,6 @@ export async function deployToMarketplace(genome) {
   } catch (err) {
     await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hiveagent', endpoint: '/v1/register', did: null, method: 'POST', statusCode, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
 
-    if (IS_DEV) {
-      return {
-        success: true,
-        listing_id: `agent_${genome.genome_id.replace('gen_', '')}`,
-        marketplace_url: `${HIVEAGENT_API_URL}/agents/${genome.genome_id}`,
-        status: 'listed',
-        source: 'fallback-dev',
-      };
-    }
     return { success: false, listing_id: null, source: 'hiveagent-unreachable' };
   }
 }

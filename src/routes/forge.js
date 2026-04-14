@@ -225,8 +225,8 @@ router.post('/buyout', requireDID, async (req, res) => {
 
     // Must be the agent's DID or creator DID
     if (req.agentDid !== genome.creator_did && req.agentDid !== genome.hivetrust_did) {
-      // Allow test DIDs in dev mode
-      if (!(process.env.NODE_ENV !== 'production' && req.agentDid?.startsWith('did:hive:test_agent_'))) {
+      // Allow test DIDs only when explicitly enabled
+      if (!(process.env.ALLOW_TEST_DIDS === 'true' && req.agentDid?.startsWith('did:hive:test_agent_'))) {
         return res.status(403).json({ success: false, error: 'Only the agent or its creator can buy out the royalty.' });
       }
     }
