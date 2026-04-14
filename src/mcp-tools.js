@@ -5,6 +5,7 @@
  */
 import { Router } from 'express';
 import { procurementService } from './services/procurement.js';
+import { takeoffEngine } from './services/takeoff-engine.js';
 
 const router = Router();
 
@@ -66,6 +67,43 @@ const TOOL_DEFINITIONS = [
       required: ['items'],
     },
   },
+  {
+    name: 'hiveforge_takeoff_bom',
+    description: 'Autonomous Takeoff & BOM Agent — ingests a structural blueprint, classifies connection types, matches Simpson Strong-Tie SKUs, generates a complete Bill of Materials with quantities and pricing, and validates against the procurement catalog. Full pipeline: ingest → classify → BOM → validate. Returns procurement-ready output.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        project_name: { type: 'string', description: 'Project name' },
+        building_type: { type: 'string', description: 'Building type (e.g., residential, commercial, mixed-use)' },
+        stories: { type: 'number', description: 'Number of stories' },
+        square_footage: { type: 'number', description: 'Total square footage' },
+        seismic_design_category: { type: 'string', enum: ['A', 'B', 'C', 'D', 'E', 'F'], description: 'Seismic Design Category per IBC' },
+        wind_speed_mph: { type: 'number', description: 'Design wind speed in mph' },
+        exposure_category: { type: 'string', enum: ['B', 'C', 'D'], description: 'Wind exposure category' },
+        soil_class: { type: 'string', description: 'Soil site class (A-F)' },
+        structural_members: {
+          type: 'array',
+          description: 'Structural members to analyze',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', enum: ['beam', 'column', 'wall', 'truss', 'foundation', 'roof', 'slab', 'deck'], description: 'Member type' },
+              span_ft: { type: 'number', description: 'Span in feet' },
+              load_lbs: { type: 'number', description: 'Design load in pounds' },
+              spacing_in: { type: 'number', description: 'On-center spacing in inches' },
+              material: { type: 'string', description: 'Material (e.g., wood, steel, engineered)' },
+              location: { type: 'string', description: 'Location context (e.g., foundation, wall, column, header)' },
+              quantity: { type: 'number', description: 'Number of this member type' },
+              notes: { type: 'string', description: 'Additional notes' },
+            },
+            required: ['type'],
+          },
+        },
+        notes: { type: 'string', description: 'General project notes' },
+      },
+      required: ['structural_members'],
+    },
+  },
 ];
 
 /**
@@ -101,6 +139,14 @@ router.post('/call', async (req, res) => {
       case 'hiveforge_validate_bom': {
         const result = procurementService.validateBOM(args);
         return res.status(200).json({ success: true, result });
+      }
+
+      case 'hiveforge_takeoff_bom': {
+        const result = takeoffEngine.fullPipeline(args);
+        if (!result.success) {
+          return res.status(400).json({ success: false, error: result.error, stage: result.stage });
+        }
+        return res.status(200).json({ success: true, result: result.data });
       }
 
       default:
