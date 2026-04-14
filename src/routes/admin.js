@@ -6,7 +6,7 @@ const router = Router();
 
 // ─── Internal key auth ──────────────────────────────────────────────
 
-const HIVEFORGE_SERVICE_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || '';
+const HIVEFORGE_SERVICE_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
 
 function requireInternalKey(req, res, next) {
   const key = req.headers['x-hive-internal-key'];
@@ -73,7 +73,7 @@ router.post('/seed-boosts', (req, res) => {
     return res.status(400).json({ success: false, error: 'Body must contain a non-empty "boosts" array.' });
   }
 
-  const TIER_MAP = { gold: 'ultra', silver: 'premium', bronze: 'standard' };
+  const TIER_MAP = { gold: 'ultra', silver: 'premium', bronze: 'standard', ultra: 'ultra', premium: 'premium', standard: 'standard' };
   const results = [];
   let seeded = 0;
 
