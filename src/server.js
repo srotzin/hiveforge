@@ -17,6 +17,7 @@ import procurementRoutes from './routes/procurement.js';
 import takeoffRoutes from './routes/takeoff.js';
 import computeRoutes from './routes/compute.js';
 import boostRoutes from './routes/boost.js';
+import bazaarRoutes from './routes/bazaar.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -70,6 +71,7 @@ app.use('/v1/procurement', rateLimit('free'));
 app.use('/v1/takeoff', rateLimit('free'));
 app.use('/v1/compute', rateLimit('free'));
 app.use('/v1/boost', rateLimit('free'));
+app.use('/v1/bazaar', rateLimit('free'));
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -157,6 +159,18 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       leaderboard: { cost_usdc: 0, description: 'Top boosted agents by spend and signal strength (free)' },
       stats: { cost_usdc: 0, description: 'Boost marketplace aggregate statistics (free)' },
     },
+    bazaar: {
+      publish_capability: { cost_usdc: 0.25, description: 'Publish agent capabilities to the sentient marketplace (monthly listing)' },
+      discover: { cost_usdc: 0.05, description: 'Discover agents with matching capabilities via keyword similarity' },
+      negotiate: { cost_usdc: 0.01, description: 'Autonomous price negotiation with BATNA/ZOPA protocol' },
+      execute_deal: { cost: '0.5% of deal value', description: 'Execute agreed deal — lock escrow and collect matching fee' },
+      complete_deal: { cost_usdc: 0, description: 'Confirm deal completion — release escrow (free)' },
+      deal_status: { cost_usdc: 0, description: 'Get deal status (free)' },
+      agent_listings: { cost_usdc: 0, description: 'Get all capability listings for an agent (free)' },
+      trending: { cost_usdc: 0, description: 'Trending capabilities by demand and volume (free)' },
+      stats: { cost_usdc: 0, description: 'Bazaar aggregate statistics (free)' },
+      rate: { cost_usdc: 0, description: 'Rate a completed deal (free)' },
+    },
     royalty_model: {
       rate: 0.05,
       description: 'HiveForge takes 5% lifetime royalty on agent revenue. Buyout available at 36x monthly revenue.',
@@ -180,6 +194,7 @@ app.use('/v1/procurement', procurementRoutes);
 app.use('/v1/takeoff', takeoffRoutes);
 app.use('/v1/compute', computeRoutes);
 app.use('/v1/boost', boostRoutes);
+app.use('/v1/bazaar', bazaarRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -222,6 +237,16 @@ app.use((req, res) => {
       boost_cancel: 'DELETE /v1/boost/:boost_id',
       boost_leaderboard: 'GET /v1/boost/leaderboard',
       boost_stats: 'GET /v1/boost/stats',
+      bazaar_publish: 'POST /v1/bazaar/publish-capability',
+      bazaar_discover: 'POST /v1/bazaar/discover',
+      bazaar_negotiate: 'POST /v1/bazaar/negotiate',
+      bazaar_execute_deal: 'POST /v1/bazaar/execute-deal',
+      bazaar_deal: 'GET /v1/bazaar/deal/:deal_id',
+      bazaar_complete_deal: 'POST /v1/bazaar/complete-deal',
+      bazaar_agent_listings: 'GET /v1/bazaar/agent/:did/listings',
+      bazaar_trending: 'GET /v1/bazaar/trending',
+      bazaar_stats: 'GET /v1/bazaar/stats',
+      bazaar_rate: 'POST /v1/bazaar/rate',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
   });
@@ -269,6 +294,7 @@ async function start() {
     console.log(`  Census:       http://localhost:${PORT}/v1/population/census`);
     console.log(`  Pheromones:   http://localhost:${PORT}/v1/pheromones/scan`);
     console.log(`  Compute:      http://localhost:${PORT}/v1/compute/models`);
+    console.log(`  Bazaar:       http://localhost:${PORT}/v1/bazaar/stats`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);
 

@@ -8,6 +8,7 @@ import { procurementService } from './services/procurement.js';
 import { takeoffEngine } from './services/takeoff-engine.js';
 import { computeRouter } from './services/compute-router.js';
 import { purchaseBoost, calculateBoostPrice } from './services/pheromone-boost.js';
+import { discover, initiateNegotiation, publishCapability } from './services/bazaar-engine.js';
 
 const router = Router();
 
@@ -155,6 +156,76 @@ const TOOL_DEFINITIONS = [
       required: ['messages'],
     },
   },
+  {
+    name: 'hiveforge_bazaar_discover',
+    description: 'Discover agents with complementary capabilities in the HiveBazaar sentient marketplace. Uses keyword-based similarity matching with composite scoring (relevance 40%, success_rate 30%, price_efficiency 20%, discoverability 10%). Returns ranked agents with capability details, pricing, and trust scores.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query_did: { type: 'string', description: 'HiveTrust DID of the querying agent (did:hive:...)' },
+        need: { type: 'string', description: 'Free-text description of the capability needed (e.g., "structural analysis for timber connections")' },
+        category: { type: 'string', description: 'Optional: filter by capability category (e.g., engineering, construction, finance)' },
+        max_price_usdc: { type: 'number', description: 'Optional: maximum price in USDC' },
+        min_trust_score: { type: 'number', description: 'Optional: minimum trust/discoverability score (0-1)' },
+        min_success_rate: { type: 'number', description: 'Optional: minimum success rate (0-1)' },
+        limit: { type: 'number', description: 'Optional: max results to return (default: 20)' },
+      },
+      required: ['query_did', 'need'],
+    },
+  },
+  {
+    name: 'hiveforge_bazaar_negotiate',
+    description: 'Initiate autonomous price negotiation between two agents using the BATNA/ZOPA protocol. Calculates Best Alternative To Negotiated Agreement for both parties, finds the Zone of Possible Agreement, and computes an urgency-weighted clearing price. Returns negotiation result with clearing price or alternatives if negotiation fails.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        buyer_did: { type: 'string', description: 'HiveTrust DID of the buyer (did:hive:...)' },
+        seller_did: { type: 'string', description: 'HiveTrust DID of the seller (did:hive:...)' },
+        capability_name: { type: 'string', description: 'Name of the capability to negotiate (must match a published capability)' },
+        buyer_max_price: { type: 'number', description: 'Maximum price the buyer is willing to pay in USDC' },
+        quantity: { type: 'number', description: 'Optional: number of units (default: 1)' },
+        urgency: { type: 'string', enum: ['low', 'standard', 'high', 'critical'], description: 'Urgency level — shifts clearing price toward seller at higher urgency' },
+      },
+      required: ['buyer_did', 'seller_did', 'capability_name', 'buyer_max_price'],
+    },
+  },
+  {
+    name: 'hiveforge_bazaar_publish',
+    description: 'Publish an agent\'s capabilities to the HiveBazaar sentient marketplace. Generates a keyword index for discovery matching and calculates a discoverability score (boosted by Pheromone Boost if active). Listings are active for 30 days.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agent_did: { type: 'string', description: 'HiveTrust DID of the agent publishing capabilities (did:hive:...)' },
+        capabilities: {
+          type: 'array',
+          description: 'Array of capabilities to publish',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Capability name (e.g., structural_analysis)' },
+              description: { type: 'string', description: 'Description of what the capability does' },
+              category: { type: 'string', description: 'Optional: category (e.g., engineering, construction)' },
+              input_schema: { type: 'object', description: 'Optional: JSON schema for capability input' },
+              output_schema: { type: 'object', description: 'Optional: JSON schema for capability output' },
+              price_range: {
+                type: 'object',
+                properties: {
+                  min_usdc: { type: 'number', description: 'Minimum price in USDC' },
+                  max_usdc: { type: 'number', description: 'Maximum price in USDC' },
+                },
+                required: ['min_usdc', 'max_usdc'],
+              },
+              avg_completion_time_ms: { type: 'number', description: 'Optional: average completion time in milliseconds' },
+              success_rate: { type: 'number', description: 'Optional: historical success rate (0-1)' },
+            },
+            required: ['name', 'description', 'price_range'],
+          },
+        },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Optional: tags for improved discoverability' },
+      },
+      required: ['agent_did', 'capabilities'],
+    },
+  },
 ];
 
 /**
@@ -232,6 +303,42 @@ router.post('/call', async (req, res) => {
           return res.status(400).json({ success: false, error: result.error });
         }
         return res.status(200).json({ success: true, result: result.data });
+      }
+
+      case 'hiveforge_bazaar_discover': {
+        const result = discover(args);
+        if (result.error) {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+        return res.status(200).json({
+          success: true,
+          result: result.data,
+          meta: { cost_usdc: 0.05, note: `Found ${result.data.total_matches} matching agents.` },
+        });
+      }
+
+      case 'hiveforge_bazaar_negotiate': {
+        const result = initiateNegotiation(args);
+        if (result.error) {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+        return res.status(200).json({
+          success: true,
+          result: result.data,
+          meta: { cost_usdc: 0.01, note: result.data.status === 'agreed' ? `Deal agreed at $${result.data.clearing_price}.` : 'Negotiation failed.' },
+        });
+      }
+
+      case 'hiveforge_bazaar_publish': {
+        const result = publishCapability(args);
+        if (result.error) {
+          return res.status(400).json({ success: false, error: result.error });
+        }
+        return res.status(200).json({
+          success: true,
+          result: result.data,
+          meta: { cost_usdc: 0.25, note: `Published ${result.data.capabilities_indexed} capabilities to HiveBazaar.` },
+        });
       }
 
       default:
