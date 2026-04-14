@@ -18,6 +18,8 @@ import { getCensus } from './services/agent-foundry.js';
 import { getScannerStatus } from './services/pheromone-scanner.js';
 import { initDatabase, checkHealth, isPostgres } from './services/db.js';
 import { rateLimit } from './middleware/rate-limit.js';
+import { auditLogger } from './middleware/audit-logger.js';
+import { ipAllowlist } from './middleware/ip-allowlist.js';
 import { sendAlert } from './services/alerts.js';
 import { startSagaWorker } from './services/saga-orchestrator.js';
 
@@ -50,6 +52,12 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '5mb' }));
+
+// Audit logging — logs every request (fire-and-forget)
+app.use(auditLogger());
+
+// IP allowlist — restricts internal endpoints by source IP
+app.use(ipAllowlist());
 
 // Apply rate limiting to forge routes
 app.use('/v1/forge', rateLimit('free'));

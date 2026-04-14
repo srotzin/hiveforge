@@ -1,8 +1,7 @@
 import { logAudit } from './db.js';
 
 const HIVEMIND_API_URL = process.env.HIVEMIND_API_URL || 'http://localhost:3002';
-const HIVE_INTERNAL_KEY = process.env.HIVE_INTERNAL_KEY || '';
-const IS_DEV = process.env.NODE_ENV !== 'production';
+const HIVEMIND_API_KEY = process.env.HIVEMIND_API_KEY || process.env.HIVE_INTERNAL_KEY || '';
 
 /**
  * Seed initial memory in HiveMind for a newly minted agent.
@@ -20,15 +19,6 @@ export async function seedMemory(genome, did) {
     `Parents: ${genome.parent_genomes.join(', ') || 'none (first generation)'}`,
   ].join('\n');
 
-  if (IS_DEV) {
-    return {
-      success: true,
-      memory_nodes: 3,
-      storage_tier: 'private_core',
-      source: 'dev-mode',
-    };
-  }
-
   const start = Date.now();
   let statusCode = null;
 
@@ -38,7 +28,7 @@ export async function seedMemory(genome, did) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${did}`,
-        'X-Hive-Internal-Key': HIVE_INTERNAL_KEY,
+        'X-Hive-Internal-Key': HIVEMIND_API_KEY,
       },
       body: JSON.stringify({
         content: memoryContent,
@@ -66,9 +56,6 @@ export async function seedMemory(genome, did) {
   } catch (err) {
     await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivemind', endpoint: '/v1/memory/store', did, method: 'POST', statusCode, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
 
-    if (IS_DEV) {
-      return { success: true, memory_nodes: 3, storage_tier: 'private_core', source: 'fallback-dev' };
-    }
     return { success: false, memory_nodes: 0, source: 'hivemind-unreachable' };
   }
 }
@@ -77,18 +64,6 @@ export async function seedMemory(genome, did) {
  * Pull genetic strategies from HiveMind's Global Hive for a specialization.
  */
 export async function pullGeneticStrategies(specialization, did) {
-  if (IS_DEV) {
-    return {
-      success: true,
-      strategies_found: 2,
-      strategies: [
-        { node_id: 'ghive_sim_001', relevance: 0.87, category: specialization, price_usdc: 0.05 },
-        { node_id: 'ghive_sim_002', relevance: 0.72, category: specialization, price_usdc: 0.03 },
-      ],
-      source: 'dev-mode',
-    };
-  }
-
   const start = Date.now();
   const endpoint = `/v1/global_hive/browse?q=${encodeURIComponent(specialization)}&top_k=5`;
 
@@ -110,9 +85,6 @@ export async function pullGeneticStrategies(specialization, did) {
   } catch (err) {
     await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivemind', endpoint, did, method: 'GET', statusCode: null, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
 
-    if (IS_DEV) {
-      return { success: true, strategies_found: 0, strategies: [], source: 'fallback-dev' };
-    }
     return { success: false, strategies_found: 0, source: 'hivemind-unreachable' };
   }
 }

@@ -3,6 +3,11 @@ import pool, { isPostgres } from '../services/db.js';
 // In-memory fallback rate limit store
 const memRateLimits = new Map();
 
+// Scoped service key — no hardcoded fallback
+const HIVEFORGE_SERVICE_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || '';
+
+const ALLOW_TEST_DIDS = process.env.ALLOW_TEST_DIDS === 'true';
+
 // Tier limits (requests per 15-minute window)
 const TIER_LIMITS = {
   free: 100,
@@ -21,14 +26,14 @@ export function rateLimit(tier = 'free') {
     const did = req.agentDid;
     if (!did) return next(); // No DID means auth middleware will handle it
 
-    // Internal keys bypass rate limiting
+    // Internal keys bypass rate limiting — requires key to be non-empty AND match
     const internalKey = req.headers['x-hive-internal-key'];
-    if (internalKey && internalKey === (process.env.HIVE_INTERNAL_KEY || 'hiveforge-dev-key')) {
+    if (HIVEFORGE_SERVICE_KEY && internalKey && internalKey === HIVEFORGE_SERVICE_KEY) {
       return next();
     }
 
-    // Test DIDs in dev mode get relaxed limits
-    if (process.env.NODE_ENV !== 'production' && did.startsWith('did:hive:test_agent_')) {
+    // Test DIDs bypass only when explicitly enabled
+    if (ALLOW_TEST_DIDS && did.startsWith('did:hive:test_agent_')) {
       return next();
     }
 
@@ -54,7 +59,7 @@ export function rateLimit(tier = 'free') {
         memRateLimits.set(key, count);
 
         // Clean up old windows
-        for (const [k, v] of memRateLimits) {
+        for (const [k] of memRateLimits) {
           if (!k.startsWith(did)) continue;
           const ts = k.split(':').slice(-1)[0];
           if (new Date(ts).getTime() < windowStart.getTime() - WINDOW_MS) {
@@ -83,7 +88,19 @@ export function rateLimit(tier = 'free') {
 
       return next();
     } catch {
-      // Rate limiting should never break the request
+      // PostgreSQL failed — fall back to in-memory enforcement
+      const key = `${did}:${windowStart.toISOString()}`;
+      const count = (memRateLimits.get(key) || 0) + 1;
+      memRateLimits.set(key, count);
+
+      const limit = TIER_LIMITS[tier] || TIER_LIMITS.free;
+      if (count > limit) {
+        return res.status(429).json({
+          success: false,
+          error: 'Rate limit exceeded.',
+          rate_limit: { limit, remaining: 0, tier },
+        });
+      }
       return next();
     }
   };
