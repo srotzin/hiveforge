@@ -239,9 +239,9 @@ router.get('/agent/:did/listings', requireDID, (req, res) => {
 
 /**
  * GET /v1/bazaar/trending — Trending capabilities
- * Auth: requireDID (free)
+ * Public endpoint (no auth required — free browsing)
  */
-router.get('/trending', requireDID, (req, res) => {
+router.get('/trending', (req, res) => {
   const result = getTrending();
   return res.status(200).json({
     success: true,
@@ -254,9 +254,9 @@ router.get('/trending', requireDID, (req, res) => {
 
 /**
  * GET /v1/bazaar/stats — Bazaar statistics
- * Auth: requireDID (free)
+ * Public endpoint (no auth required — free browsing)
  */
-router.get('/stats', requireDID, (req, res) => {
+router.get('/stats', (req, res) => {
   const result = getStats();
   return res.status(200).json({
     success: true,

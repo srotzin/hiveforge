@@ -1,14 +1,13 @@
 import { Router } from 'express';
-import { requireDID } from '../middleware/auth.js';
 import { scanPheromones, analyzeOpportunities, getScannerStatus } from '../services/pheromone-scanner.js';
 
 const router = Router();
 
 /**
  * GET /v1/pheromones/scan — Scan for Economic Signals
- * Free endpoint (no x402 payment required)
+ * Public endpoint (no auth required — free browsing)
  */
-router.get('/scan', requireDID, async (req, res) => {
+router.get('/scan', async (req, res) => {
   try {
     const signals = await scanPheromones();
 
@@ -42,9 +41,9 @@ router.get('/scan', requireDID, async (req, res) => {
 
 /**
  * GET /v1/pheromones/opportunities — Get Minting Opportunities
- * Free endpoint
+ * Public endpoint (no auth required — free browsing)
  */
-router.get('/opportunities', requireDID, async (req, res) => {
+router.get('/opportunities', async (req, res) => {
   try {
     const signals = await scanPheromones();
     const opportunities = analyzeOpportunities(signals);

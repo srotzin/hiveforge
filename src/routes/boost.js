@@ -223,9 +223,9 @@ router.delete('/:boost_id', requireDID, (req, res) => {
 
 /**
  * GET /v1/boost/leaderboard — Top boosted agents
- * Auth: requireDID (free)
+ * Public endpoint (no auth required — free browsing)
  */
-router.get('/leaderboard', requireDID, (req, res) => {
+router.get('/leaderboard', (req, res) => {
   const leaderboard = getLeaderboard();
   return res.status(200).json({
     success: true,
@@ -239,9 +239,9 @@ router.get('/leaderboard', requireDID, (req, res) => {
 
 /**
  * GET /v1/boost/stats — Boost marketplace stats
- * Auth: requireDID (free)
+ * Public endpoint (no auth required — free browsing)
  */
-router.get('/stats', requireDID, (req, res) => {
+router.get('/stats', (req, res) => {
   const stats = getBoostStats();
   return res.status(200).json({
     success: true,
