@@ -19,6 +19,7 @@ import computeRoutes from './routes/compute.js';
 import boostRoutes from './routes/boost.js';
 import bazaarRoutes from './routes/bazaar.js';
 import spawnerRoutes from './routes/spawner.js';
+import adminRoutes from './routes/admin.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -424,6 +425,7 @@ app.use('/v1/compute', computeRoutes);
 app.use('/v1/boost', boostRoutes);
 app.use('/v1/bazaar', bazaarRoutes);
 app.use('/v1/spawner', spawnerRoutes);
+app.use('/v1/admin', adminRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
