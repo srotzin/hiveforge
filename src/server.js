@@ -30,6 +30,7 @@ import { ipAllowlist } from './middleware/ip-allowlist.js';
 import { sendAlert } from './services/alerts.js';
 import { startSagaWorker } from './services/saga-orchestrator.js';
 import { initSpawnerTables, startSpawnerLoop, isSpawnerRunning } from './services/spawner.js';
+import { initVelvetRopeTables } from './services/velvet-rope.js';
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -56,6 +57,7 @@ app.use(cors({
     'X-Subscription-Id',
     'X-Hive-Internal-Key',
     'X-HiveTrust-DID',
+    'X-Payment',
   ],
 }));
 
@@ -179,6 +181,9 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       trigger: { cost_usdc: 0, description: 'Manually trigger the auto-spawning engine (free, auth required)' },
       config: { cost_usdc: 0, description: 'Get or update spawner configuration (free, auth required)' },
       activity: { cost_usdc: 0, description: 'View spawning activity log (free, auth required)' },
+      waitlist: { cost_usdc: 0, description: 'View spawn queue with demand signals (free, public)' },
+      demand_heatmap: { cost_usdc: 0, description: 'Category demand heatmap (free, public)' },
+      priority_trigger: { cost_usdc: 50, description: 'Priority spawning — skip queue, +50 fitness, priority trait (50 USDC)' },
     },
     royalty_model: {
       rate: 0.05,
@@ -261,6 +266,9 @@ app.use((req, res) => {
       spawner_config_get: 'GET /v1/spawner/config',
       spawner_config_update: 'POST /v1/spawner/config',
       spawner_activity: 'GET /v1/spawner/activity',
+      spawner_waitlist: 'GET /v1/spawner/waitlist',
+      spawner_demand_heatmap: 'GET /v1/spawner/demand-heatmap',
+      spawner_priority_trigger: 'POST /v1/spawner/priority-trigger',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
   });
@@ -302,6 +310,7 @@ async function start() {
 
   // Initialize spawner tables before listening
   await initSpawnerTables();
+  await initVelvetRopeTables();
 
   app.listen(PORT, () => {
     console.log(`\n  HiveForge API v1.0.0`);

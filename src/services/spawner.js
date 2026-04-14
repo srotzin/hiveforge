@@ -5,6 +5,7 @@ import { crossbreed } from './genetic-engine.js';
 import { mintAgent, getActiveGenomes, getGenomesBySpecies, getCensus } from './agent-foundry.js';
 import { scanPheromones, analyzeOpportunities } from './pheromone-scanner.js';
 import { calculateFitness } from './fitness-evaluator.js';
+import { decrementQueue, addToQueue } from './velvet-rope.js';
 
 // ─── Cross-Service URLs ─────────────────────────────────────────────
 
@@ -660,6 +661,11 @@ export async function triggerSpawning({ trigger = 'manual', context = {} } = {})
         if (result.success) spawnResults.push(result.spawn_event);
       }
     }
+  }
+
+  // Decrement waitlist queue for each successful spawn
+  for (let i = 0; i < spawnResults.length; i++) {
+    decrementQueue().catch(() => {});
   }
 
   return {

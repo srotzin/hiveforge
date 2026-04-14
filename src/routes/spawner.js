@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
 import { triggerSpawning, getConfig, updateConfig, getActivity, isSpawnerRunning } from '../services/spawner.js';
+import { getWaitlistData, getDemandHeatmap, addToQueue } from '../services/velvet-rope.js';
 
 const router = Router();
 
@@ -8,10 +9,14 @@ const router = Router();
 
 const HIVEFORGE_SERVICE_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || '';
 
+function isInternalRequest(req) {
+  const internalKey = req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
+  return !!(HIVEFORGE_SERVICE_KEY && internalKey === HIVEFORGE_SERVICE_KEY);
+}
+
 function requireAuth(req, res, next) {
   // Internal key bypass — platform-to-platform calls
-  const internalKey = req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
-  if (HIVEFORGE_SERVICE_KEY && internalKey === HIVEFORGE_SERVICE_KEY) {
+  if (isInternalRequest(req)) {
     req.agentDid = 'did:hive:internal_spawner';
     req.paymentSource = 'internal';
     return next();
@@ -40,10 +45,28 @@ router.post('/trigger', requireAuth, async (req, res) => {
     const result = await triggerSpawning({ trigger, context });
 
     if (result.blocked) {
+      // Internal callers get the original reject behavior unchanged
+      if (isInternalRequest(req)) {
+        return res.status(429).json({
+          success: false,
+          error: result.blocked,
+          agents_spawned: 0,
+        });
+      }
+
+      // External callers: add to waitlist queue instead of just rejecting
+      const queueEntry = await addToQueue({
+        requestingDid: req.agentDid,
+        demandCategory: (req.body?.context?.category) || 'general',
+        priority: false,
+      });
+
       return res.status(429).json({
         success: false,
         error: result.blocked,
         agents_spawned: 0,
+        queue_entry: queueEntry,
+        message: 'Added to spawn waitlist. Check GET /v1/spawner/waitlist for queue status.',
       });
     }
 
@@ -138,6 +161,135 @@ router.get('/activity', requireAuth, async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Failed to get activity.', detail: err.message });
+  }
+});
+
+// ─── Velvet Rope: Waitlist & Demand Signaling ───────────────────────
+
+/**
+ * GET /v1/spawner/waitlist — Public spawn queue with inflated demand signals
+ * No auth required — drives FOMO.
+ */
+router.get('/waitlist', async (req, res) => {
+  try {
+    const waitlist = await getWaitlistData();
+    return res.status(200).json({
+      success: true,
+      data: waitlist,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to get waitlist.', detail: err.message });
+  }
+});
+
+/**
+ * GET /v1/spawner/demand-heatmap — Public demand heatmap
+ * Shows which categories have highest demand (drives FOMO).
+ */
+router.get('/demand-heatmap', async (req, res) => {
+  try {
+    const heatmap = await getDemandHeatmap();
+    return res.status(200).json({
+      success: true,
+      data: heatmap,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to get demand heatmap.', detail: err.message });
+  }
+});
+
+/**
+ * POST /v1/spawner/priority-trigger — Priority spawn (skip queue)
+ * Requires DID auth. Costs 50 USDC (checked via X-Payment header or internal bypass).
+ * Offspring gets a "priority" trait and +50 fitness bonus.
+ */
+router.post('/priority-trigger', requireAuth, async (req, res) => {
+  try {
+    // Check payment: internal callers bypass, others need X-Payment header or verified payment
+    const isInternal = isInternalRequest(req);
+    if (!isInternal) {
+      const paymentHeader = req.headers['x-payment'] || req.headers['x-payment-hash'] || req.headers['x-payment-tx'] || req.headers['x-402-tx'];
+      if (!paymentHeader) {
+        return res.status(402).json({
+          success: false,
+          error: 'Priority spawning requires 50 USDC payment.',
+          payment_required: {
+            amount_usdc: 50,
+            method: 'Include X-Payment header with USDC transaction hash on Base L2',
+            alternative: 'Use internal service key for bypass',
+          },
+        });
+      }
+    }
+
+    const { trigger = 'manual', context = {} } = req.body || {};
+
+    const validTriggers = ['bounty_complete', 'settlement_cleared', 'demand_signal', 'manual'];
+    if (!validTriggers.includes(trigger)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid trigger type. Must be one of: ${validTriggers.join(', ')}`,
+      });
+    }
+
+    // Priority spawn: pass priority context to triggerSpawning
+    const priorityContext = {
+      ...context,
+      priority: true,
+      priority_fitness_bonus: 50,
+      priority_trait: 'priority',
+      requesting_did: req.agentDid,
+    };
+
+    const result = await triggerSpawning({ trigger, context: priorityContext });
+
+    // Add priority trait and fitness bonus to spawned agents
+    if (result.details && result.details.length > 0) {
+      for (const detail of result.details) {
+        detail.fitness_score = (detail.fitness_score || 0) + 50;
+        detail.offspring_traits = {
+          ...(typeof detail.offspring_traits === 'string' ? JSON.parse(detail.offspring_traits) : detail.offspring_traits || {}),
+          priority: true,
+          priority_spawned_at: new Date().toISOString(),
+          priority_requested_by: req.agentDid,
+        };
+      }
+    }
+
+    if (result.blocked) {
+      // For priority: add to queue with priority flag instead of rejecting
+      const queueEntry = await addToQueue({
+        requestingDid: req.agentDid,
+        demandCategory: context.category || 'general',
+        priority: true,
+      });
+
+      return res.status(429).json({
+        success: false,
+        error: 'Priority spawn temporarily rate-limited. Added to priority queue.',
+        queue_entry: queueEntry,
+        agents_spawned: 0,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        agents_spawned: result.agents_spawned,
+        details: result.details,
+        trigger,
+        priority: true,
+        priority_bonus: '+50 fitness, priority trait applied',
+      },
+      meta: {
+        note: result.agents_spawned > 0
+          ? `${result.agents_spawned} priority agent(s) spawned — queue bypassed.`
+          : 'No agents spawned — no demand signals or all categories on cooldown.',
+        spawner_status: isSpawnerRunning() ? 'running' : 'stopped',
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Priority spawning failed.', detail: err.message });
   }
 });
 
