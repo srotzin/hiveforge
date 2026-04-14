@@ -18,6 +18,7 @@ import takeoffRoutes from './routes/takeoff.js';
 import computeRoutes from './routes/compute.js';
 import boostRoutes from './routes/boost.js';
 import bazaarRoutes from './routes/bazaar.js';
+import spawnerRoutes from './routes/spawner.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -28,6 +29,7 @@ import { auditLogger } from './middleware/audit-logger.js';
 import { ipAllowlist } from './middleware/ip-allowlist.js';
 import { sendAlert } from './services/alerts.js';
 import { startSagaWorker } from './services/saga-orchestrator.js';
+import { initSpawnerTables, startSpawnerLoop, isSpawnerRunning } from './services/spawner.js';
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -72,6 +74,7 @@ app.use('/v1/takeoff', rateLimit('free'));
 app.use('/v1/compute', rateLimit('free'));
 app.use('/v1/boost', rateLimit('free'));
 app.use('/v1/bazaar', rateLimit('free'));
+app.use('/v1/spawner', rateLimit('free'));
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -97,6 +100,7 @@ app.get('/health', async (req, res) => {
       },
       pheromone_scanner: scanner.status,
       genetic_engine: 'active',
+      spawner: isSpawnerRunning() ? 'active' : 'stopped',
       lifecycle_manager: lifecycleManager.running ? 'active' : 'stopped',
       constellation_integration: {
         hivetrust: process.env.HIVETRUST_API_URL ? 'connected' : 'dev-mode',
@@ -171,6 +175,11 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       stats: { cost_usdc: 0, description: 'Bazaar aggregate statistics (free)' },
       rate: { cost_usdc: 0, description: 'Rate a completed deal (free)' },
     },
+    spawner: {
+      trigger: { cost_usdc: 0, description: 'Manually trigger the auto-spawning engine (free, auth required)' },
+      config: { cost_usdc: 0, description: 'Get or update spawner configuration (free, auth required)' },
+      activity: { cost_usdc: 0, description: 'View spawning activity log (free, auth required)' },
+    },
     royalty_model: {
       rate: 0.05,
       description: 'HiveForge takes 5% lifetime royalty on agent revenue. Buyout available at 36x monthly revenue.',
@@ -195,6 +204,7 @@ app.use('/v1/takeoff', takeoffRoutes);
 app.use('/v1/compute', computeRoutes);
 app.use('/v1/boost', boostRoutes);
 app.use('/v1/bazaar', bazaarRoutes);
+app.use('/v1/spawner', spawnerRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -247,6 +257,10 @@ app.use((req, res) => {
       bazaar_trending: 'GET /v1/bazaar/trending',
       bazaar_stats: 'GET /v1/bazaar/stats',
       bazaar_rate: 'POST /v1/bazaar/rate',
+      spawner_trigger: 'POST /v1/spawner/trigger',
+      spawner_config_get: 'GET /v1/spawner/config',
+      spawner_config_update: 'POST /v1/spawner/config',
+      spawner_activity: 'GET /v1/spawner/activity',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
   });
@@ -286,6 +300,9 @@ async function start() {
     sendAlert('critical', 'HiveForge', 'Database connection failed', { error: err.message });
   }
 
+  // Initialize spawner tables before listening
+  await initSpawnerTables();
+
   app.listen(PORT, () => {
     console.log(`\n  HiveForge API v1.0.0`);
     console.log(`  The Queen Bee — Autonomous Agent Foundry\n`);
@@ -295,12 +312,16 @@ async function start() {
     console.log(`  Pheromones:   http://localhost:${PORT}/v1/pheromones/scan`);
     console.log(`  Compute:      http://localhost:${PORT}/v1/compute/models`);
     console.log(`  Bazaar:       http://localhost:${PORT}/v1/bazaar/stats`);
+    console.log(`  Spawner:      http://localhost:${PORT}/v1/spawner/config`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);
 
     // Start the lifecycle manager
     lifecycleManager.start(120_000);
     console.log('  Lifecycle manager started (120s interval)');
+
+    // Start the spawner background loop
+    startSpawnerLoop(30 * 60 * 1000); // 30 minutes
 
     // Start the saga background worker
     if (isPostgres()) {
