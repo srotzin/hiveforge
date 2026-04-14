@@ -322,7 +322,8 @@ app.get('/', (req, res) => {
     },
     discovery: {
       ai_plugin: '/.well-known/ai-plugin.json',
-      agent_card: '/.well-known/agent.json',
+      agent_card: '/.well-known/agent-card.json',
+      agent_card_legacy: '/.well-known/agent.json',
       payment_info: '/.well-known/hive-payments.json',
     },
   });
@@ -359,7 +360,7 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
 
 // ─── A2A Agent Card ─────────────────────────────────────────────────
 
-app.get('/.well-known/agent.json', (req, res) => {
+app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) => {
   res.json({
     name: 'HiveForge',
     description: 'Genetic agent evolution and compute marketplace. Mint new agent genomes, crossbreed for trait inheritance, evolve populations through fitness selection, route LLM inference through the compute marketplace, and trade capabilities on the sentient bazaar.',
