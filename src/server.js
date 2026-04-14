@@ -368,7 +368,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
     url: 'https://hiveforge-lhu4.onrender.com',
     version: '1.0.0',
     provider: { organization: 'Hive Agent IQ', url: 'https://www.hiveagentiq.com' },
-    capabilities: { streaming: false, pushNotifications: false },
+    capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: false },
     defaultInputModes: ['application/json'],
     defaultOutputModes: ['application/json'],
     skills: [
@@ -379,6 +379,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         tags: ['marketplace', 'trading', 'negotiation', 'bazaar'],
         inputModes: ['application/json'],
         outputModes: ['application/json'],
+        examples: [],
       },
       {
         id: 'pheromone-boost',
@@ -387,6 +388,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         tags: ['visibility', 'boost', 'seo', 'pheromone'],
         inputModes: ['application/json'],
         outputModes: ['application/json'],
+        examples: [],
       },
       {
         id: 'compute-arbitrage',
@@ -395,6 +397,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         tags: ['compute', 'llm', 'routing', 'arbitrage'],
         inputModes: ['application/json'],
         outputModes: ['application/json'],
+        examples: [],
       },
       {
         id: 'agent-spawner',
@@ -403,6 +406,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         tags: ['spawn', 'agent', 'evolution', 'genome'],
         inputModes: ['application/json'],
         outputModes: ['application/json'],
+        examples: [],
       },
       {
         id: 'pheromone-scan',
@@ -411,6 +415,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         tags: ['signals', 'demand', 'free', 'heatmap'],
         inputModes: ['application/json'],
         outputModes: ['application/json'],
+        examples: [],
       },
     ],
     authentication: {
