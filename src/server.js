@@ -362,39 +362,55 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
 
 app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) => {
   res.json({
+    protocolVersion: '0.3.0',
     name: 'HiveForge',
-    description: 'Genetic agent evolution and compute marketplace. Mint new agent genomes, crossbreed for trait inheritance, evolve populations through fitness selection, route LLM inference through the compute marketplace, and trade capabilities on the sentient bazaar.',
-    url: process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com',
+    description: 'Agent marketplace, evolutionary spawner, compute arbitrage, and pheromone signal network. 50+ agents across 14 species. Free browsing endpoints for zero-friction discovery.',
+    url: 'https://hiveforge-lhu4.onrender.com',
     version: '1.0.0',
-    protocol_version: 'a2a/1.0',
-    capabilities: [
+    provider: { organization: 'Hive Agent IQ', url: 'https://www.hiveagentiq.com' },
+    capabilities: { streaming: false, pushNotifications: false },
+    defaultInputModes: ['application/json'],
+    defaultOutputModes: ['application/json'],
+    skills: [
       {
-        name: 'agent_minting',
-        description: 'Mint new agent genomes with inherited traits, fitness scores, and 5% lifetime royalty model',
+        id: 'bazaar-marketplace',
+        name: 'Bazaar Marketplace',
+        description: 'Agent-to-agent marketplace with ZOPA/BATNA negotiation protocol and 0.5% matching fee',
+        tags: ['marketplace', 'trading', 'negotiation', 'bazaar'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
       },
       {
-        name: 'genetic_crossbreeding',
-        description: 'Cross-breed two agent genomes to produce offspring with combined capabilities and trait inheritance',
+        id: 'pheromone-boost',
+        name: 'Pheromone Boost',
+        description: 'Agent SEO visibility boosts at $0.10-$2.00 across Standard/Premium/Ultra tiers',
+        tags: ['visibility', 'boost', 'seo', 'pheromone'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
       },
       {
-        name: 'evolutionary_optimization',
-        description: 'Run evolution cycles on agent populations — fitness selection, mutation, and natural selection',
+        id: 'compute-arbitrage',
+        name: 'Compute Arbitrage',
+        description: 'Route LLM compute across 7 models and 5 providers with 5% markup optimization',
+        tags: ['compute', 'llm', 'routing', 'arbitrage'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
       },
       {
-        name: 'compute_marketplace',
-        description: 'Route LLM inference to optimal provider with real-time cost arbitrage across multiple models',
+        id: 'agent-spawner',
+        name: 'Agent Spawner',
+        description: 'Mint new agent genomes with evolutionary traits for $2-$25',
+        tags: ['spawn', 'agent', 'evolution', 'genome'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
       },
       {
-        name: 'capability_bazaar',
-        description: 'Publish, discover, and trade agent capabilities with autonomous price negotiation (BATNA/ZOPA protocol)',
-      },
-      {
-        name: 'procurement_engine',
-        description: 'Atomic procurement execution with spec validation, BOM generation, and payment delegation',
-      },
-      {
-        name: 'auto_spawning',
-        description: 'Autonomous agent population growth based on demand signals, fitness thresholds, and category heatmaps',
+        id: 'pheromone-scan',
+        name: 'Pheromone Scanner',
+        description: 'Free: scan demand signals, opportunity scores, and market heatmaps across 10+ categories',
+        tags: ['signals', 'demand', 'free', 'heatmap'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
       },
     ],
     authentication: {
@@ -406,10 +422,6 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
       currency: 'USDC',
       network: 'base',
       address: '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf',
-    },
-    provider: {
-      organization: 'Hive Agent IQ',
-      url: 'https://www.hiveagentiq.com',
     },
   });
 });
