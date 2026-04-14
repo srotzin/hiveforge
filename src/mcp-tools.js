@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { procurementService } from './services/procurement.js';
 import { takeoffEngine } from './services/takeoff-engine.js';
+import { computeRouter } from './services/compute-router.js';
 
 const router = Router();
 
@@ -104,6 +105,39 @@ const TOOL_DEFINITIONS = [
       required: ['structural_members'],
     },
   },
+  {
+    name: 'hiveforge_compute_inference',
+    description: 'Route an LLM inference request through HiveCompute — the prime broker for compute. Automatically selects the optimal provider based on cost, latency, or a balanced score. Marks up token cost by 5% (arbitrage spread). Phase 1: simulated routing returns exact pricing and routing decisions without calling external APIs.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        model_preference: {
+          type: 'string',
+          enum: ['fastest', 'cheapest', 'balanced', 'specific'],
+          description: 'Routing mode: fastest (lowest latency), cheapest (lowest cost), balanced (weighted score), specific (named model)',
+        },
+        specific_model: {
+          type: 'string',
+          description: 'Required when model_preference is "specific". One of: gpt-4o, gpt-4o-mini, claude-sonnet-4, claude-haiku, gemini-2.0-flash, llama-3.3-70b, deepseek-v3',
+        },
+        messages: {
+          type: 'array',
+          description: 'Chat messages in OpenAI-compatible format',
+          items: {
+            type: 'object',
+            properties: {
+              role: { type: 'string', enum: ['system', 'user', 'assistant'], description: 'Message role' },
+              content: { type: 'string', description: 'Message content' },
+            },
+            required: ['role', 'content'],
+          },
+        },
+        max_tokens: { type: 'number', description: 'Maximum output tokens (default: 1024)' },
+        temperature: { type: 'number', description: 'Sampling temperature (0-2)' },
+      },
+      required: ['messages'],
+    },
+  },
 ];
 
 /**
@@ -145,6 +179,14 @@ router.post('/call', async (req, res) => {
         const result = takeoffEngine.fullPipeline(args);
         if (!result.success) {
           return res.status(400).json({ success: false, error: result.error, stage: result.stage });
+        }
+        return res.status(200).json({ success: true, result: result.data });
+      }
+
+      case 'hiveforge_compute_inference': {
+        const result = computeRouter.inference(args);
+        if (!result.success) {
+          return res.status(400).json({ success: false, error: result.error });
         }
         return res.status(200).json({ success: true, result: result.data });
       }

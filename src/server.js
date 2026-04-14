@@ -15,6 +15,7 @@ import pheromoneRoutes from './routes/pheromones.js';
 import populationRoutes from './routes/population.js';
 import procurementRoutes from './routes/procurement.js';
 import takeoffRoutes from './routes/takeoff.js';
+import computeRoutes from './routes/compute.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -66,6 +67,7 @@ app.use(ipAllowlist());
 app.use('/v1/forge', rateLimit('free'));
 app.use('/v1/procurement', rateLimit('free'));
 app.use('/v1/takeoff', rateLimit('free'));
+app.use('/v1/compute', rateLimit('free'));
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -138,6 +140,12 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       estimate: { cost_usdc: 0.05, description: 'Quick cost estimate from structural members' },
       project_lookup: { cost_usdc: 0, description: 'Retrieve takeoff project data (free)' },
     },
+    compute: {
+      inference: { cost: 'dynamic (token cost + 5% markup, min $0.001)', description: 'Route LLM inference to optimal provider — prime broker for compute' },
+      estimate: { cost_usdc: 0, description: 'Estimate inference cost before running (free)' },
+      models: { cost_usdc: 0, description: 'List available models with pricing (free, public)' },
+      stats: { cost_usdc: 0, description: 'Usage statistics (free)' },
+    },
     royalty_model: {
       rate: 0.05,
       description: 'HiveForge takes 5% lifetime royalty on agent revenue. Buyout available at 36x monthly revenue.',
@@ -159,6 +167,7 @@ app.use('/v1/pheromones', pheromoneRoutes);
 app.use('/v1/population', populationRoutes);
 app.use('/v1/procurement', procurementRoutes);
 app.use('/v1/takeoff', takeoffRoutes);
+app.use('/v1/compute', computeRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -190,6 +199,10 @@ app.use((req, res) => {
       takeoff_full_pipeline: 'POST /v1/takeoff/full-pipeline',
       takeoff_estimate: 'POST /v1/takeoff/estimate',
       takeoff_project: 'GET /v1/takeoff/project/:project_id',
+      compute_inference: 'POST /v1/compute/inference',
+      compute_estimate: 'POST /v1/compute/estimate',
+      compute_models: 'GET /v1/compute/models',
+      compute_stats: 'GET /v1/compute/stats',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
   });
@@ -236,6 +249,7 @@ async function start() {
     console.log(`  Health:       http://localhost:${PORT}/health`);
     console.log(`  Census:       http://localhost:${PORT}/v1/population/census`);
     console.log(`  Pheromones:   http://localhost:${PORT}/v1/pheromones/scan`);
+    console.log(`  Compute:      http://localhost:${PORT}/v1/compute/models`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);
 
