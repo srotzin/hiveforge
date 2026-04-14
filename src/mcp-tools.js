@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { procurementService } from './services/procurement.js';
 import { takeoffEngine } from './services/takeoff-engine.js';
 import { computeRouter } from './services/compute-router.js';
+import { purchaseBoost, calculateBoostPrice } from './services/pheromone-boost.js';
 
 const router = Router();
 
@@ -66,6 +67,22 @@ const TOOL_DEFINITIONS = [
         },
       },
       required: ['items'],
+    },
+  },
+  {
+    name: 'hiveforge_purchase_boost',
+    description: 'Purchase a Pheromone Boost — paid signal amplification in the agent discovery registry. Boosted agents have their pheromone signals multiplied, ensuring they are evaluated first when other agents search the registry. Standard (1.5x), Premium (3x), Ultra (5x) at 24h/72h/168h durations. Pricing: Standard $0.10-$0.50, Premium $0.25-$1.00, Ultra $0.50-$2.00.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        target_did: { type: 'string', description: 'HiveTrust DID of the agent to boost (did:hive:...)' },
+        purchaser_did: { type: 'string', description: 'HiveTrust DID of the purchaser (did:hive:...)' },
+        boost_type: { type: 'string', enum: ['standard', 'premium', 'ultra'], description: 'Boost tier — standard (1.5x), premium (3x), ultra (5x)' },
+        duration_hours: { type: 'number', enum: [24, 72, 168], description: 'Boost duration in hours' },
+        category: { type: 'string', description: 'Optional: pheromone category to boost (e.g., construction_procurement)' },
+        description: { type: 'string', description: 'Optional: description of the boost purpose' },
+      },
+      required: ['target_did', 'purchaser_did', 'boost_type', 'duration_hours'],
     },
   },
   {
@@ -173,6 +190,32 @@ router.post('/call', async (req, res) => {
       case 'hiveforge_validate_bom': {
         const result = procurementService.validateBOM(args);
         return res.status(200).json({ success: true, result });
+      }
+
+      case 'hiveforge_purchase_boost': {
+        const price = calculateBoostPrice(args.boost_type, args.duration_hours);
+        if (price === null) {
+          return res.status(400).json({
+            success: false,
+            error: `Invalid boost_type "${args.boost_type}" or duration_hours "${args.duration_hours}".`,
+          });
+        }
+        const boostResult = purchaseBoost(
+          args.target_did,
+          args.boost_type,
+          args.duration_hours,
+          args.purchaser_did,
+          args.category || null,
+          args.description || null,
+        );
+        if (boostResult.error) {
+          return res.status(400).json({ success: false, error: boostResult.error });
+        }
+        return res.status(200).json({
+          success: true,
+          result: boostResult.boost,
+          meta: { cost_usdc: boostResult.boost.cost_usdc, note: 'Pheromone boost purchased via MCP tool.' },
+        });
       }
 
       case 'hiveforge_takeoff_bom': {

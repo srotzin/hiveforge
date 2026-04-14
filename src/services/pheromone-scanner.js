@@ -1,5 +1,6 @@
 import { createPheromoneSignal } from '../models/schemas.js';
 import pool, { isPostgres } from './db.js';
+import { getBoostMultiplier } from './pheromone-boost.js';
 
 const HIVEAGENT_API_URL = process.env.HIVEAGENT_API_URL || 'https://hiveagentiq.com';
 const IS_DEV = process.env.NODE_ENV !== 'production';
@@ -122,6 +123,27 @@ export function analyzeOpportunities(signals) {
     }));
 
   return opportunities;
+}
+
+/**
+ * Apply boost multipliers to pheromone signals.
+ * Boosted agents have their signal strength amplified.
+ * @param {Array} signals - raw pheromone signals
+ * @param {string} [did] - optional DID to apply boost for
+ * @returns {Array} signals with boost multipliers applied
+ */
+export function applyBoostMultipliers(signals, did) {
+  if (!did) return signals;
+  const multiplier = getBoostMultiplier(did);
+  if (multiplier <= 1.0) return signals;
+
+  return signals.map(s => ({
+    ...s,
+    opportunity_score: +Math.min(1, s.opportunity_score * multiplier).toFixed(4),
+    estimated_roi_usdc: +(s.estimated_roi_usdc * multiplier).toFixed(2),
+    boosted: true,
+    boost_multiplier: multiplier,
+  }));
 }
 
 /**

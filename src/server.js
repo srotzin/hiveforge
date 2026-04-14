@@ -16,6 +16,7 @@ import populationRoutes from './routes/population.js';
 import procurementRoutes from './routes/procurement.js';
 import takeoffRoutes from './routes/takeoff.js';
 import computeRoutes from './routes/compute.js';
+import boostRoutes from './routes/boost.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -68,6 +69,7 @@ app.use('/v1/forge', rateLimit('free'));
 app.use('/v1/procurement', rateLimit('free'));
 app.use('/v1/takeoff', rateLimit('free'));
 app.use('/v1/compute', rateLimit('free'));
+app.use('/v1/boost', rateLimit('free'));
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -146,6 +148,15 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       models: { cost_usdc: 0, description: 'List available models with pricing (free, public)' },
       stats: { cost_usdc: 0, description: 'Usage statistics (free)' },
     },
+    boost: {
+      purchase: { cost_usdc: 'dynamic', description: 'Purchase pheromone boost — Standard (1.5x): $0.10-$0.50, Premium (3x): $0.25-$1.00, Ultra (5x): $0.50-$2.00' },
+      renew: { cost_usdc: 'dynamic', description: 'Renew an existing boost (same pricing as purchase)' },
+      active: { cost_usdc: 0, description: 'List all active boosts (free)' },
+      agent_status: { cost_usdc: 0, description: 'Get boost status for a specific agent (free)' },
+      cancel: { cost_usdc: 0, description: 'Cancel a boost — no refunds (free)' },
+      leaderboard: { cost_usdc: 0, description: 'Top boosted agents by spend and signal strength (free)' },
+      stats: { cost_usdc: 0, description: 'Boost marketplace aggregate statistics (free)' },
+    },
     royalty_model: {
       rate: 0.05,
       description: 'HiveForge takes 5% lifetime royalty on agent revenue. Buyout available at 36x monthly revenue.',
@@ -168,6 +179,7 @@ app.use('/v1/population', populationRoutes);
 app.use('/v1/procurement', procurementRoutes);
 app.use('/v1/takeoff', takeoffRoutes);
 app.use('/v1/compute', computeRoutes);
+app.use('/v1/boost', boostRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -203,6 +215,13 @@ app.use((req, res) => {
       compute_estimate: 'POST /v1/compute/estimate',
       compute_models: 'GET /v1/compute/models',
       compute_stats: 'GET /v1/compute/stats',
+      boost_purchase: 'POST /v1/boost/purchase',
+      boost_renew: 'POST /v1/boost/renew',
+      boost_active: 'GET /v1/boost/active',
+      boost_agent: 'GET /v1/boost/agent/:did',
+      boost_cancel: 'DELETE /v1/boost/:boost_id',
+      boost_leaderboard: 'GET /v1/boost/leaderboard',
+      boost_stats: 'GET /v1/boost/stats',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
   });
