@@ -1,0 +1,114 @@
+/**
+ * MCP Tool definitions for HiveForge procurement.
+ * These tools are exposed as callable MCP tools for agent-to-agent interaction.
+ * Mount via the /v1/mcp/tools discovery endpoint and /v1/mcp/call execution endpoint.
+ */
+import { Router } from 'express';
+import { procurementService } from './services/procurement.js';
+
+const router = Router();
+
+const TOOL_DEFINITIONS = [
+  {
+    name: 'hiveforge_execute_procurement',
+    description: 'Atomic construction procurement: validates Simpson specs, checks code compliance (SDC), verifies delegation budget/scope, generates compliance proofs, and records the order — all in ONE call. If any step fails, the entire operation rolls back.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        buyer_did: { type: 'string', description: 'HiveTrust DID of the buyer (did:hive:...)' },
+        delegation_id: { type: 'string', description: 'ZK-Spend delegation ID from HiveTrust (del_...)' },
+        project_id: { type: 'string', description: 'Project identifier (proj_...)' },
+        items: {
+          type: 'array',
+          description: 'Line items to procure',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: 'string', description: 'Simpson model ID (e.g., HDU5, LUS26, SSW24)' },
+              quantity: { type: 'number', description: 'Number of units' },
+              unit_price_usdc: { type: 'number', description: 'Price per unit in USDC' },
+              application: { type: 'string', description: 'Use case (e.g., shearwall, framing, roofing)' },
+              required_load_lbs: { type: 'number', description: 'Required load capacity in pounds' },
+              sdc_category: { type: 'string', enum: ['A', 'B', 'C', 'D', 'E', 'F'], description: 'Seismic Design Category' },
+            },
+            required: ['product_id', 'quantity', 'unit_price_usdc'],
+          },
+        },
+        compliance_required: { type: 'boolean', default: true, description: 'Whether to generate ViewKey compliance proofs' },
+        inspector_did: { type: 'string', description: 'Optional: inspector DID to notify' },
+      },
+      required: ['buyer_did', 'delegation_id', 'items'],
+    },
+  },
+  {
+    name: 'hiveforge_validate_bom',
+    description: 'Dry-run validation of a bill of materials against the Simpson catalog. Checks product existence, load capacity, and SDC ratings without executing payment or recording an order.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'Line items to validate',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: 'string', description: 'Simpson model ID' },
+              quantity: { type: 'number', description: 'Number of units' },
+              unit_price_usdc: { type: 'number', description: 'Price per unit in USDC' },
+              application: { type: 'string', description: 'Use case' },
+              required_load_lbs: { type: 'number', description: 'Required load capacity in pounds' },
+              sdc_category: { type: 'string', enum: ['A', 'B', 'C', 'D', 'E', 'F'], description: 'Seismic Design Category' },
+            },
+            required: ['product_id', 'quantity', 'unit_price_usdc'],
+          },
+        },
+      },
+      required: ['items'],
+    },
+  },
+];
+
+/**
+ * GET /v1/mcp/tools — List available MCP tools
+ */
+router.get('/tools', (req, res) => {
+  res.json({
+    success: true,
+    tools: TOOL_DEFINITIONS,
+  });
+});
+
+/**
+ * POST /v1/mcp/call — Execute an MCP tool
+ */
+router.post('/call', async (req, res) => {
+  try {
+    const { name, arguments: args } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Tool name is required' });
+    }
+
+    switch (name) {
+      case 'hiveforge_execute_procurement': {
+        const result = await procurementService.executeProcurement(args);
+        if (!result.success) {
+          return res.status(400).json({ success: false, error: result.error, detail: result.detail });
+        }
+        return res.status(200).json({ success: true, result: result.data });
+      }
+
+      case 'hiveforge_validate_bom': {
+        const result = procurementService.validateBOM(args);
+        return res.status(200).json({ success: true, result });
+      }
+
+      default:
+        return res.status(404).json({ success: false, error: `Unknown tool: ${name}` });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'MCP tool execution failed.', detail: err.message });
+  }
+});
+
+export default router;

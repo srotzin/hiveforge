@@ -156,6 +156,23 @@ export async function initDatabase() {
         did TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_spent_payments_verified_at ON public.spent_payments(verified_at);
+
+      -- Procurement orders (atomic construction procurement)
+      CREATE TABLE IF NOT EXISTS hiveforge.procurement_orders (
+        id TEXT PRIMARY KEY DEFAULT ('ord_' || lower(encode(gen_random_bytes(8), 'hex'))),
+        buyer_did TEXT NOT NULL,
+        project_id TEXT,
+        delegation_id TEXT,
+        items JSONB NOT NULL,
+        total_usdc NUMERIC(12, 4) NOT NULL,
+        status TEXT DEFAULT 'completed' CHECK (status IN ('completed', 'failed', 'rolled_back')),
+        order_hash TEXT NOT NULL UNIQUE,
+        compliance_certificate_hash TEXT,
+        failure_reason TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_orders_buyer ON hiveforge.procurement_orders(buyer_did);
+      CREATE INDEX IF NOT EXISTS idx_orders_project ON hiveforge.procurement_orders(project_id);
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');

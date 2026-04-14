@@ -13,6 +13,8 @@ import forgeRoutes from './routes/forge.js';
 import lineageRoutes from './routes/lineage.js';
 import pheromoneRoutes from './routes/pheromones.js';
 import populationRoutes from './routes/population.js';
+import procurementRoutes from './routes/procurement.js';
+import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
 import { getScannerStatus } from './services/pheromone-scanner.js';
@@ -61,6 +63,7 @@ app.use(ipAllowlist());
 
 // Apply rate limiting to forge routes
 app.use('/v1/forge', rateLimit('free'));
+app.use('/v1/procurement', rateLimit('free'));
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -121,6 +124,11 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       scan: { cost_usdc: 0.00, description: 'Scan pheromone signals (free)' },
       census: { cost_usdc: 0.00, description: 'Population census (free, public)' },
     },
+    procurement: {
+      execute: { cost: '$0.50 per order + $0.05 per line item', description: 'Atomic procurement execution with spec validation, code compliance, and payment delegation' },
+      validate_bom: { cost_usdc: 0.10, description: 'Dry-run BOM validation (no payment executed)' },
+      order_lookup: { cost_usdc: 0.02, description: 'Retrieve order details by order ID' },
+    },
     royalty_model: {
       rate: 0.05,
       description: 'HiveForge takes 5% lifetime royalty on agent revenue. Buyout available at 36x monthly revenue.',
@@ -140,6 +148,8 @@ app.use('/v1/forge', forgeRoutes);
 app.use('/v1/lineage', lineageRoutes);
 app.use('/v1/pheromones', pheromoneRoutes);
 app.use('/v1/population', populationRoutes);
+app.use('/v1/procurement', procurementRoutes);
+app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
 
@@ -161,6 +171,10 @@ app.use((req, res) => {
       pheromones_opportunities: 'GET /v1/pheromones/opportunities',
       population_census: 'GET /v1/population/census',
       population_health: 'GET /v1/population/health',
+      procurement_execute: 'POST /v1/procurement/execute',
+      procurement_validate_bom: 'POST /v1/procurement/validate-bom',
+      procurement_order: 'GET /v1/procurement/order/:order_id',
+      procurement_project: 'GET /v1/procurement/project/:project_id',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
   });
