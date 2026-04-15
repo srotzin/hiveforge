@@ -367,7 +367,7 @@ router.post('/call', async (req, res) => {
             operation: result.operation,
             trifecta: result.trifecta,
           },
-          meta: { cost_usdc: 0, royalty_rate: 0.05, note: 'Minting is FREE. HiveForge takes 5% lifetime royalty on agent revenue.' },
+          meta: { cost_usdc: 0, royalty_rate: 0.05, note: 'Agent minted. $19.99 includes DID + 3 USDC Ritz Credits + 5% lifetime royalty.' },
         });
       }
 

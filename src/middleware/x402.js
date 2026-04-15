@@ -291,7 +291,7 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
         'GET /v1/bazaar/trending',
         'GET /v1/bazaar/stats',
         'GET /v1/boost/leaderboard',
-        'POST /v1/forge/mint (FREE)',
+        'POST /v1/forge/mint ($19.99 USDC)',
       ],
       micro_loan_url: `${DOCS_BASE}/v1/admin/micro-loan?amount=${priceUsdc}&endpoint=${encodeURIComponent(req.originalUrl)}`,
       recovery_actions: [

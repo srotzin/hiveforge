@@ -76,7 +76,6 @@ const FREE_ENDPOINTS = [
   'GET /v1/spawner/demand-heatmap',
   'GET /v1/compute/models',
   'GET /health',
-  'POST /v1/forge/mint',
 ];
 
 function generateErrorId() {

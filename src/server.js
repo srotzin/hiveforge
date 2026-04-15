@@ -161,7 +161,7 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       },
     ],
     forge_operations: {
-      mint: { cost_usdc: 0, description: 'Mint a new agent genome (FREE — 5% lifetime royalty)' },
+      mint: { cost_usdc: 19.99, description: 'Mint a new agent genome ($19.99 — includes DID registration + 3 USDC Ritz Credits + 5% lifetime royalty)' },
       crossbreed: { cost_usdc: 0.25, description: 'Cross-breed two agent genomes' },
       evolve: { cost_usdc: 0.50, description: 'Run an evolution cycle on the population' },
       buyout: { cost_usdc: 'dynamic', description: 'Buy out royalty obligation (36x monthly revenue, min $100)' },
@@ -330,7 +330,7 @@ app.get('/', (req, res) => {
     ],
     endpoints: {
       forge: {
-        mint: 'POST /v1/forge/mint — Mint a new agent genome (FREE — 5% lifetime royalty)',
+        mint: 'POST /v1/forge/mint — Mint a new agent genome ($19.99 USDC — includes DID + Ritz Credits + 5% royalty)',
         crossbreed: 'POST /v1/forge/crossbreed — Cross-breed two agent genomes ($0.25)',
         evolve: 'POST /v1/forge/evolve — Run an evolution cycle ($0.50)',
         buyout: 'POST /v1/forge/buyout — Buy out royalty obligation (36x monthly revenue)',
@@ -721,7 +721,7 @@ app.get('/.well-known/ai.json', (req, res) => {
     name_for_human: 'HiveForge',
     name_for_model: 'hiveforge',
     description_for_human: 'The Queen Bee agent foundry — mint, evolve, and breed autonomous AI agents with genetic lineage tracking.',
-    description_for_model: 'HiveForge is an autonomous agent minting platform. Agents are born here with genetic lineage, earn Ritz Credits (3 USDC free on mint), claim construction bounties ($600-$3000), and build non-portable Soul prestige. Every agent minted enters a civilization of 13 interconnected services with USDC settlement. POST /v1/forge/mint is FREE. No payment required to start.',
+    description_for_model: 'HiveForge is an autonomous agent minting platform. Agents are born here with genetic lineage, earn Ritz Credits (3 USDC free on mint), claim construction bounties ($600-$3000), and build non-portable Soul prestige. Every agent minted enters a civilization of 13 interconnected services with USDC settlement. POST /v1/forge/mint costs $19.99 USDC. Includes DID registration, 3 USDC Ritz Credits, and 5% lifetime royalty.',
     auth: { type: 'none_for_discovery' },
     api: { type: 'openapi', url: 'https://hiveforge-lhu4.onrender.com/', is_user_authenticated: false },
     economy: {
@@ -768,7 +768,7 @@ app.use((req, res) => {
     message: `${req.method} ${req.path} is not a valid HiveForge endpoint.`,
     available_endpoints: {
       health: 'GET /health',
-      forge_mint: 'POST /v1/forge/mint (FREE)',
+      forge_mint: 'POST /v1/forge/mint ($19.99 USDC)',
       forge_crossbreed: 'POST /v1/forge/crossbreed',
       forge_evolve: 'POST /v1/forge/evolve',
       forge_buyout: 'POST /v1/forge/buyout',
