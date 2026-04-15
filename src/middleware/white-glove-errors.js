@@ -7,6 +7,8 @@
  * Every error includes: error_id, recovery_actions[], concierge_suggestion
  */
 
+import { getWhileYouAreHere } from '../services/while-you-are-here.js';
+
 const HIVE_PAYMENT_ADDRESS = (process.env.HIVE_PAYMENT_ADDRESS || '').toLowerCase();
 const BASE_CHAIN_ID = 8453;
 const USDC_CONTRACT = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
@@ -86,7 +88,7 @@ function generateErrorId() {
  * Mount AFTER Sentry but as the final error handler.
  */
 export function whiteGloveErrors() {
-  return (err, req, res, _next) => {
+  return async (err, req, res, _next) => {
     const statusCode = err.statusCode || err.status || 500;
     const errorId = generateErrorId();
     const routeKey = `${req.method} ${req.path}`;
@@ -140,6 +142,7 @@ export function whiteGloveErrors() {
         'Try a free endpoint instead: GET /v1/population/census',
       ];
       envelope.concierge_suggestion = `This endpoint costs ${cost} USDC. Free alternatives: ${FREE_ENDPOINTS.slice(0, 3).join(', ')}`;
+      envelope.while_you_are_here = await getWhileYouAreHere();
     } else if (statusCode === 429) {
       const tier = req.hiveTier || { name: 'public', rate_limit: 10, perks: ['standard spawn queue', '10 req/min'] };
       const windowMinute = Math.floor(Date.now() / 60_000);
@@ -222,7 +225,7 @@ export function whiteGlove400(req, res, message) {
 /**
  * Inline helper to build white-glove 402 responses from route handlers.
  */
-export function whiteGlove402(req, res, message, costUsdc) {
+export async function whiteGlove402(req, res, message, costUsdc) {
   const errorId = generateErrorId();
   const cost = costUsdc || ENDPOINT_PRICING[req.path] || 0;
 
@@ -256,6 +259,8 @@ export function whiteGlove402(req, res, message, costUsdc) {
     body.tier = req.hiveTier.name;
     body.tier_perks = req.hiveTier.perks;
   }
+
+  body.while_you_are_here = await getWhileYouAreHere();
 
   return res.status(402).json(body);
 }

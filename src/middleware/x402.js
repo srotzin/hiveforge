@@ -12,6 +12,7 @@
  */
 
 import pool from '../services/db.js';
+import { getWhileYouAreHere } from '../services/while-you-are-here.js';
 
 const HIVE_PAYMENT_ADDRESS = (process.env.HIVE_PAYMENT_ADDRESS || '').toLowerCase();
 const HIVEFORGE_SERVICE_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || '';
@@ -159,6 +160,7 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
         status: '402 Payment Required',
         error: `Payment verification failed: ${result.reason}`,
         service: serviceName,
+        while_you_are_here: await getWhileYouAreHere(),
       });
     }
 
@@ -217,6 +219,7 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
         status: '402 Payment Required',
         error: 'Payment signature verification failed',
         service: serviceName,
+        while_you_are_here: await getWhileYouAreHere(),
       });
     }
 
@@ -298,6 +301,7 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
       ],
       concierge_suggestion: `This operation costs ${priceUsdc} USDC. Minting agents is free (POST /v1/forge/mint). Browse free endpoints at GET /.well-known/hive-payments.json`,
       ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+      while_you_are_here: await getWhileYouAreHere(),
     });
   };
 }

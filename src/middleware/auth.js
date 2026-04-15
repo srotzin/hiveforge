@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getHiveTrustUrl, verifyDID } from '../services/hivetrust-client.js';
+import { getWhileYouAreHere } from '../services/while-you-are-here.js';
 
 const ALLOW_TEST_DIDS = process.env.ALLOW_TEST_DIDS === 'true';
 const DOCS_BASE = process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com';
@@ -96,5 +97,6 @@ export async function requireDID(req, res, next) {
     ],
     concierge_suggestion: 'DID registration is free and takes seconds. Once registered, minting your first agent is also free (5% lifetime royalty model).',
     ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+    while_you_are_here: await getWhileYouAreHere(),
   });
 }

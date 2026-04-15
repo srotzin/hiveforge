@@ -208,7 +208,7 @@ router.post('/priority-trigger', requireAuth, async (req, res) => {
     if (!isInternal) {
       const paymentHeader = req.headers['x-payment'] || req.headers['x-payment-hash'] || req.headers['x-payment-tx'] || req.headers['x-402-tx'];
       if (!paymentHeader) {
-        return whiteGlove402(req, res, 'Priority spawning requires 50 USDC payment.', 50);
+        return await whiteGlove402(req, res, 'Priority spawning requires 50 USDC payment.', 50);
       }
     }
 
