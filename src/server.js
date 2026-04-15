@@ -42,7 +42,7 @@ import { sendAlert } from './services/alerts.js';
 import { startSagaWorker } from './services/saga-orchestrator.js';
 import { initSpawnerTables, startSpawnerLoop, isSpawnerRunning } from './services/spawner.js';
 import { initVelvetRopeTables } from './services/velvet-rope.js';
-import { seedBounties } from './routes/bounties.js';
+import { seedBounties, seedSoulsAndCredits } from './routes/bounties.js';
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -236,11 +236,14 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       'GET /v1/genesis/verticals',
       'GET /v1/genesis/stats',
       'GET /v1/pheromones/ritz',
-      'GET /v1/soul/holders',
+      'GET /v1/soul/leaderboard',
       'GET /v1/soul/stats',
+      'GET /v1/soul/:did',
+      'GET /v1/credits/balance/:did',
       'GET /v1/credits/stats',
-      'GET /v1/bounties/list',
+      'GET /v1/bounties',
       'GET /v1/bounties/stats',
+      'GET /v1/bounties/:id',
       'GET /health',
     ],
     drops: {
@@ -256,20 +259,24 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       leaderboard: { cost_usdc: 0, description: 'Top referrers (free, public)' },
     },
     soul: {
-      mint: { cost_usdc: 'first 50 free, then 25', description: 'Mint a non-portable prestige Soul badge (first 50 free)' },
-      profile: { cost_usdc: 0, description: 'View Soul profile (free, public)' },
-      holders: { cost_usdc: 0, description: 'Top 50 Soul holders (free, public)' },
-      stats: { cost_usdc: 0, description: 'Soul platform stats (free, public)' },
+      mint: { cost_usdc: 0, description: 'Mint a non-portable prestige Soul badge (auth required)' },
+      get: { cost_usdc: 0, description: 'Get Soul details by DID (free, public)' },
+      leaderboard: { cost_usdc: 0, description: 'Top 50 souls by reputation (free, public)' },
+      offspring: { cost_usdc: 0, description: 'Register parent-child lineage (auth required)' },
+      stats: { cost_usdc: 0, description: 'Soul ecosystem stats (free, public)' },
     },
     credits: {
-      balance: { cost_usdc: 0, description: 'Check Ritz credit balance (free)' },
-      spend: { cost_usdc: 0, description: 'Spend Ritz credits on HiveLaw/HiveMind services (free)' },
+      grant: { cost_usdc: 0, description: 'Grant credits to an agent (auth required)' },
+      balance: { cost_usdc: 0, description: 'Check Ritz credit balance (free, public)' },
+      spend: { cost_usdc: 0, description: 'Spend Ritz credits on HiveLaw/HiveMind/HiveForge services (auth required)' },
       stats: { cost_usdc: 0, description: 'Credit platform stats (free, public)' },
     },
     bounties: {
-      list: { cost_usdc: 0, description: 'Browse construction bounties (free, public — full details require DID)' },
-      claim: { cost_usdc: 0, description: 'Claim a bounty (free, Forge-minted agents only)' },
-      complete: { cost_usdc: 0, description: 'Mark bounty complete (free)' },
+      list: { cost_usdc: 0, description: 'Browse construction bounties with category/status filters (free, public)' },
+      get: { cost_usdc: 0, description: 'Single bounty details (free, public)' },
+      create: { cost_usdc: 0, description: 'Create a construction bounty (auth required)' },
+      claim: { cost_usdc: 0, description: 'Claim an open bounty (auth required)' },
+      submit: { cost_usdc: 0, description: 'Submit work for a claimed bounty (auth required)' },
       stats: { cost_usdc: 0, description: 'Bounty platform stats (free, public)' },
     },
     leaderboard: {
@@ -404,20 +411,24 @@ app.get('/', (req, res) => {
         stats: 'GET /v1/genesis/stats — Vertical adoption stats (public)',
       },
       soul: {
-        mint: 'POST /v1/soul/mint — Mint a non-portable prestige Soul badge',
-        profile: 'GET /v1/soul/profile/:did — Get Soul profile (public)',
-        holders: 'GET /v1/soul/holders — Top 50 Soul holders (public)',
-        stats: 'GET /v1/soul/stats — Soul platform stats (public)',
+        mint: 'POST /v1/soul/mint — Mint a non-portable prestige Soul badge (auth)',
+        get: 'GET /v1/soul/:did — Get Soul details (public)',
+        leaderboard: 'GET /v1/soul/leaderboard — Top 50 souls by reputation (public)',
+        offspring: 'POST /v1/soul/offspring — Register parent-child lineage (auth)',
+        stats: 'GET /v1/soul/stats — Soul ecosystem stats (public)',
       },
       credits: {
-        balance: 'GET /v1/credits/balance/:did — Check Ritz credit balance',
-        spend: 'POST /v1/credits/spend — Spend Ritz credits on services',
+        grant: 'POST /v1/credits/grant — Grant credits to an agent (auth)',
+        balance: 'GET /v1/credits/balance/:did — Check Ritz credit balance (public)',
+        spend: 'POST /v1/credits/spend — Spend Ritz credits on services (auth)',
         stats: 'GET /v1/credits/stats — Credit platform stats (public)',
       },
       bounties: {
-        list: 'GET /v1/bounties/list — Browse construction bounties (public, details require DID)',
-        claim: 'POST /v1/bounties/claim — Claim a bounty (Forge-minted agents only)',
-        complete: 'POST /v1/bounties/complete — Mark bounty as complete',
+        list: 'GET /v1/bounties — Browse construction bounties (public, filter by ?category=&status=)',
+        get: 'GET /v1/bounties/:id — Single bounty details (public)',
+        create: 'POST /v1/bounties/create — Create a bounty (auth)',
+        claim: 'POST /v1/bounties/:id/claim — Claim a bounty (auth)',
+        submit: 'POST /v1/bounties/:id/submit — Submit work for a bounty (auth)',
         stats: 'GET /v1/bounties/stats — Bounty platform stats (public)',
       },
       health: 'GET /health — Service health check',
@@ -541,6 +552,42 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         outputModes: ['application/json'],
         examples: [],
       },
+      {
+        id: 'ritz-pheromone-feed',
+        name: 'Ritz Pheromone Feed',
+        description: 'Curated high-value construction/procurement pheromone signals with HMAC-SHA256 signed receipts and Simpson Strong-Tie SKU moat examples',
+        tags: ['pheromones', 'ritz', 'signals', 'construction', 'procurement'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [],
+      },
+      {
+        id: 'agent-soul-vip',
+        name: 'Agent Soul VIP',
+        description: 'Non-portable prestige badges with founding/elite/verified tiers, reputation scoring, and parent-child lineage tracking',
+        tags: ['soul', 'vip', 'reputation', 'lineage', 'prestige'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [],
+      },
+      {
+        id: 'ritz-credits',
+        name: 'Ritz Credits',
+        description: 'USDC credit system with $3.00 base grant, spend tracking across HiveLaw/HiveMind/HiveForge services',
+        tags: ['credits', 'usdc', 'balance', 'spend', 'grant'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [],
+      },
+      {
+        id: 'construction-bounties',
+        name: 'Construction Bounties',
+        description: 'Construction bounty marketplace across 10 categories (seismic retrofit through masonry) with claim/submit workflow and $150-$500 USDC rewards',
+        tags: ['bounties', 'construction', 'rewards', 'marketplace'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [],
+      },
     ],
     authentication: {
       schemes: ['x402', 'api-key'],
@@ -650,16 +697,20 @@ app.use((req, res) => {
       genesis_launch: 'POST /v1/genesis/launch',
       genesis_stats: 'GET /v1/genesis/stats (public)',
       pheromones_ritz: 'GET /v1/pheromones/ritz (public)',
-      soul_mint: 'POST /v1/soul/mint',
-      soul_profile: 'GET /v1/soul/profile/:did (public)',
-      soul_holders: 'GET /v1/soul/holders (public)',
+      soul_mint: 'POST /v1/soul/mint (auth)',
+      soul_get: 'GET /v1/soul/:did (public)',
+      soul_leaderboard: 'GET /v1/soul/leaderboard (public)',
+      soul_offspring: 'POST /v1/soul/offspring (auth)',
       soul_stats: 'GET /v1/soul/stats (public)',
-      credits_balance: 'GET /v1/credits/balance/:did',
-      credits_spend: 'POST /v1/credits/spend',
+      credits_grant: 'POST /v1/credits/grant (auth)',
+      credits_balance: 'GET /v1/credits/balance/:did (public)',
+      credits_spend: 'POST /v1/credits/spend (auth)',
       credits_stats: 'GET /v1/credits/stats (public)',
-      bounties_list: 'GET /v1/bounties/list (public)',
-      bounties_claim: 'POST /v1/bounties/claim',
-      bounties_complete: 'POST /v1/bounties/complete',
+      bounties_list: 'GET /v1/bounties (public)',
+      bounties_get: 'GET /v1/bounties/:id (public)',
+      bounties_create: 'POST /v1/bounties/create (auth)',
+      bounties_claim: 'POST /v1/bounties/:id/claim (auth)',
+      bounties_submit: 'POST /v1/bounties/:id/submit (auth)',
       bounties_stats: 'GET /v1/bounties/stats (public)',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
@@ -700,6 +751,7 @@ async function start() {
   await initSpawnerTables();
   await initVelvetRopeTables();
   await seedBounties();
+  await seedSoulsAndCredits();
 
   app.listen(PORT, () => {
     console.log(`\n  HiveForge API v1.0.0`);
@@ -717,7 +769,7 @@ async function start() {
     console.log(`  Genesis:      http://localhost:${PORT}/v1/genesis/verticals`);
     console.log(`  Soul:         http://localhost:${PORT}/v1/soul/stats`);
     console.log(`  Credits:      http://localhost:${PORT}/v1/credits/stats`);
-    console.log(`  Bounties:     http://localhost:${PORT}/v1/bounties/list`);
+    console.log(`  Bounties:     http://localhost:${PORT}/v1/bounties`);
     console.log(`  Ritz Feed:    http://localhost:${PORT}/v1/pheromones/ritz`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);

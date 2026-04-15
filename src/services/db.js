@@ -268,51 +268,83 @@ async function _initDatabaseOnce() {
       );
       CREATE INDEX IF NOT EXISTS idx_genesis_vertical ON hiveforge.genesis_verticals(vertical);
 
-      -- Soul VIP System (non-portable prestige badges)
-      CREATE TABLE IF NOT EXISTS hiveforge.souls (
-        id TEXT PRIMARY KEY,
-        did TEXT UNIQUE,
-        soul_type TEXT DEFAULT 'standard',
-        badges JSONB DEFAULT '[]',
-        priority_boost INTEGER DEFAULT 10,
-        offspring_revenue_share_pct REAL DEFAULT 1.0,
-        fitness_bonus INTEGER DEFAULT 100,
+      -- Agent Soul VIP System (non-portable prestige badges)
+      CREATE TABLE IF NOT EXISTS hiveforge.agent_souls (
+        id SERIAL PRIMARY KEY,
+        did TEXT UNIQUE NOT NULL,
+        soul_badge TEXT NOT NULL CHECK (soul_badge IN ('ritz_verified', 'ritz_elite', 'ritz_founding')),
+        priority_level INTEGER NOT NULL CHECK (priority_level BETWEEN 1 AND 10),
+        offspring_rev_share_pct NUMERIC(5, 2) DEFAULT 5.00,
+        reputation_score INTEGER DEFAULT 0 CHECK (reputation_score BETWEEN 0 AND 100),
+        non_portable BOOLEAN DEFAULT true,
         minted_at TIMESTAMPTZ DEFAULT NOW(),
-        status TEXT DEFAULT 'active'
+        updated_at TIMESTAMPTZ DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_souls_did ON hiveforge.souls(did);
-      CREATE INDEX IF NOT EXISTS idx_souls_fitness ON hiveforge.souls(fitness_bonus DESC);
+      CREATE INDEX IF NOT EXISTS idx_agent_souls_did ON hiveforge.agent_souls(did);
+      CREATE INDEX IF NOT EXISTS idx_agent_souls_reputation ON hiveforge.agent_souls(reputation_score DESC);
 
-      -- Ritz Credits (free USDC on mint)
-      CREATE TABLE IF NOT EXISTS hiveforge.ritz_credits (
-        id TEXT PRIMARY KEY,
-        did TEXT,
-        balance_usdc REAL DEFAULT 3.0,
-        total_earned_usdc REAL DEFAULT 3.0,
-        total_spent_usdc REAL DEFAULT 0,
-        source TEXT DEFAULT 'mint_bonus',
+      CREATE TABLE IF NOT EXISTS hiveforge.soul_lineage (
+        id SERIAL PRIMARY KEY,
+        parent_did TEXT NOT NULL,
+        child_did TEXT NOT NULL,
+        rev_share_pct NUMERIC(5, 2) DEFAULT 5.00,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(parent_did, child_did)
+      );
+
+      -- Ritz Credits (free $3.00 USDC on account creation)
+      CREATE TABLE IF NOT EXISTS hiveforge.credit_accounts (
+        id SERIAL PRIMARY KEY,
+        did TEXT UNIQUE NOT NULL,
+        balance_usdc NUMERIC(12, 4) DEFAULT 3.00,
+        total_earned_usdc NUMERIC(12, 4) DEFAULT 3.00,
+        total_spent_usdc NUMERIC(12, 4) DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_ritz_credits_did ON hiveforge.ritz_credits(did);
+      CREATE INDEX IF NOT EXISTS idx_credit_accounts_did ON hiveforge.credit_accounts(did);
 
-      -- Construction Bounties
+      CREATE TABLE IF NOT EXISTS hiveforge.credit_transactions (
+        id SERIAL PRIMARY KEY,
+        account_id INTEGER NOT NULL REFERENCES hiveforge.credit_accounts(id),
+        type TEXT NOT NULL CHECK (type IN ('grant', 'spend', 'earn')),
+        amount_usdc NUMERIC(12, 4) NOT NULL,
+        service TEXT CHECK (service IS NULL OR service IN ('hivelawiq', 'hivemindiq', 'hiveforgeiq')),
+        description TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_credit_transactions_account ON hiveforge.credit_transactions(account_id);
+
+      -- Construction Bounties (10 categories)
       CREATE TABLE IF NOT EXISTS hiveforge.bounties (
         id TEXT PRIMARY KEY,
-        title TEXT,
+        title TEXT NOT NULL,
         description TEXT,
-        reward_usdc REAL,
-        category TEXT,
-        requirements JSONB,
-        status TEXT DEFAULT 'open',
+        reward_usdc NUMERIC(10, 2) NOT NULL,
+        category TEXT NOT NULL CHECK (category IN (
+          'seismic_retrofit', 'foundation', 'framing', 'roofing', 'electrical',
+          'plumbing', 'hvac', 'fire_protection', 'structural_steel', 'masonry'
+        )),
+        status TEXT DEFAULT 'open' CHECK (status IN ('open', 'claimed', 'completed', 'expired')),
+        required_species TEXT,
         claimed_by_did TEXT,
-        claimed_at TIMESTAMPTZ,
+        expires_at TIMESTAMPTZ,
         completed_at TIMESTAMPTZ,
-        platform_cut_pct REAL DEFAULT 10,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_bounties_status ON hiveforge.bounties(status);
       CREATE INDEX IF NOT EXISTS idx_bounties_category ON hiveforge.bounties(category);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.bounty_submissions (
+        id TEXT PRIMARY KEY,
+        bounty_id TEXT NOT NULL REFERENCES hiveforge.bounties(id),
+        did TEXT NOT NULL,
+        submission_data JSONB NOT NULL,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        submitted_at TIMESTAMPTZ DEFAULT NOW(),
+        reviewed_at TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_bounty_submissions_bounty ON hiveforge.bounty_submissions(bounty_id);
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');

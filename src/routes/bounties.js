@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { requireDID } from '../middleware/auth.js';
 import pool, { isPostgres } from '../services/db.js';
 
 const router = Router();
@@ -8,442 +7,352 @@ const router = Router();
 const KNOWN_INTERNAL_KEY = 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
 const HIVE_INTERNAL_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || KNOWN_INTERNAL_KEY;
 
+const VALID_CATEGORIES = [
+  'seismic_retrofit', 'foundation', 'framing', 'roofing', 'electrical',
+  'plumbing', 'hvac', 'fire_protection', 'structural_steel', 'masonry',
+];
+
 // ─── In-memory fallback stores ──────────────────────────────────────
 
 const memBounties = new Map();
+const memSubmissions = [];
 
-// ─── Seed Bounties ──────────────────────────────────────────────────
+// ─── Auth Helper ────────────────────────────────────────────────────
+
+function requireInternalHeader(req, res, next) {
+  const key = req.headers['x-hive-internal'] || req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
+  if (key !== HIVE_INTERNAL_KEY && key !== KNOWN_INTERNAL_KEY) {
+    return res.status(403).json({ success: false, error: 'Forbidden — invalid or missing x-hive-internal header.' });
+  }
+  next();
+}
+
+// ─── Seed Data ──────────────────────────────────────────────────────
 
 const SEED_BOUNTIES = [
-  {
-    title: 'ICC-ES Compliant BOM — LA County Seismic Retrofit',
-    description: 'Generate a complete Bill of Materials for a seismic retrofit project in LA County. All materials must have current ICC-ES Evaluation Reports (ESR). Include Simpson Strong-Tie holdowns, anchor bolts, and strapping per CBC §1613A. BOM must pass plan check review for LADBS Express Permit program.',
-    reward_usdc: 1500,
-    category: 'structural_engineering',
-    requirements: { certifications: ['ICC-ES ESR familiarity', 'CBC seismic provisions'], deliverables: ['Complete BOM with ESR numbers', 'LADBS Express Permit compliance check', 'Cost estimate with 3 supplier quotes'], deadline_days: 14 },
-  },
-  {
-    title: 'Simpson Strong-Tie HDU Spec — 3-Story Wood Frame',
-    description: 'Specify Simpson Strong-Tie HDU holdown schedule for a 3-story Type V wood-frame residential building. Include uplift calculations per ASCE 7-22, holdown selection per Simpson catalog, and anchor bolt embedment per ACI 318-19 Chapter 17.',
-    reward_usdc: 1200,
-    category: 'structural_engineering',
-    requirements: { certifications: ['Simpson Strong-Tie product knowledge', 'ASCE 7-22 wind/seismic'], deliverables: ['Holdown schedule with HDU model numbers', 'Uplift calculation summary', 'Anchor bolt embedment details'], deadline_days: 10 },
-  },
-  {
-    title: 'IBC 2024 Wind Load Analysis — Miami-Dade County',
-    description: 'Perform a complete wind load analysis for a 4-story commercial building in Miami-Dade County HVHZ. Use ASCE 7-22 wind speed maps with FBC 8th Edition amendments. Include MWFRS and C&C pressures for all building surfaces.',
-    reward_usdc: 2000,
-    category: 'wind_engineering',
-    requirements: { certifications: ['PE license (FL preferred)', 'ASCE 7-22 proficiency'], deliverables: ['MWFRS pressure calculations', 'C&C pressure tables', 'Miami-Dade NOA product recommendations', 'Signed/sealed calculation package'], deadline_days: 21 },
-  },
-  {
-    title: 'Foundation Anchor Bolt Schedule — Commercial Tilt-Up',
-    description: 'Design anchor bolt schedule for a 50,000 SF tilt-up concrete commercial building. Include panel-to-footing connections, panel-to-panel connections, and ledger connections. All anchors must be ASTM F1554 Grade 55 minimum with ICC-ES ESR qualifications.',
-    reward_usdc: 800,
-    category: 'structural_engineering',
-    requirements: { certifications: ['Tilt-up construction experience', 'ACI 318 Chapter 17'], deliverables: ['Anchor bolt schedule with sizes and embedments', 'Edge distance and spacing checks', 'Supplier specification sheet'], deadline_days: 7 },
-  },
-  {
-    title: 'Moment Frame Connection Design — Steel SMF',
-    description: 'Design prequalified moment frame connections per AISC 358-22 for a 6-story steel special moment frame (SMF) building in Seismic Design Category D. Include RBS connection details, panel zone checks, and strong-column-weak-beam verification.',
-    reward_usdc: 2500,
-    category: 'steel_design',
-    requirements: { certifications: ['AISC 358-22 proficiency', 'Seismic design experience'], deliverables: ['RBS connection design calculations', 'Panel zone shear check', 'Strong-column-weak-beam verification', 'Connection detail drawings'], deadline_days: 28 },
-  },
-  {
-    title: 'Shear Wall Hold-Down Schedule — Residential',
-    description: 'Create a complete shear wall holdown schedule for a 2-story single-family residence in Seismic Design Category D. Include Simpson Strong-Tie product selections, nailing schedules, and anchor bolt specifications per 2024 CBC.',
-    reward_usdc: 600,
-    category: 'residential_engineering',
-    requirements: { certifications: ['Residential structural design', 'Simpson product familiarity'], deliverables: ['Shear wall schedule with aspect ratios', 'Holdown schedule with Simpson model numbers', 'Nailing schedule per CBC Table 2306.3'], deadline_days: 5 },
-  },
-  {
-    title: 'Post-Installed Anchor Qualification — ACI 318',
-    description: 'Qualify a post-installed adhesive anchor system for use in cracked concrete per ACI 318-19 Chapter 17 and ACI 355.4. Include pullout, shear, and combined load calculations for a hospital equipment anchorage application (Risk Category IV).',
-    reward_usdc: 1800,
-    category: 'anchor_design',
-    requirements: { certifications: ['ACI 318 Chapter 17 expertise', 'ACI 355.4 testing knowledge'], deliverables: ['Anchor qualification report', 'Pullout and shear calculations', 'Combined tension/shear interaction check', 'Inspection protocol for Ip=1.5'], deadline_days: 14 },
-  },
-  {
-    title: 'Mass Timber Connection Package — CLT/Glulam',
-    description: 'Design a complete connection package for a 4-story mass timber building using CLT floor panels and Glulam beams/columns. Include panel-to-beam, beam-to-column, and column-to-foundation connections with fire-rating considerations per IBC §602.4.',
-    reward_usdc: 3000,
-    category: 'mass_timber',
-    requirements: { certifications: ['NDS 2024 proficiency', 'Mass timber experience', 'Fire protection design'], deliverables: ['Connection detail package (12+ connections)', 'Charring calculations per NDS Chapter 16', 'Fire-rated assembly specifications', 'Fabrication-ready connection drawings'], deadline_days: 35 },
-  },
-  {
-    title: 'Seismic Bracing Layout — Hospital Essential Facility',
-    description: 'Design seismic bracing layout for MEP systems in a 120,000 SF hospital (Risk Category IV, Ip=1.5). Include pipe bracing, duct bracing, and equipment anchorage per ASCE 7-22 Chapter 13 and OSHPD/HCAi pre-approval requirements.',
-    reward_usdc: 2200,
-    category: 'seismic_design',
-    requirements: { certifications: ['OSHPD/HCAi experience', 'ASCE 7-22 Chapter 13', 'SMACNA Seismic Restraint Manual'], deliverables: ['Seismic bracing layout drawings', 'Equipment anchorage calculations', 'HCAi pre-approval submittal package', 'Inspection protocol'], deadline_days: 28 },
-  },
-  {
-    title: 'Fire-Rated Assembly BOM — 2-Hour Wall',
-    description: 'Generate a complete BOM for 2-hour fire-rated wall assemblies throughout a 3-story mixed-use building. Include UL Design Numbers, GA file numbers, material specifications, and installation notes. Must cover both load-bearing and non-load-bearing conditions.',
-    reward_usdc: 1000,
-    category: 'fire_protection',
-    requirements: { certifications: ['UL fire-rated assembly knowledge', 'GA-600 familiarity'], deliverables: ['Fire-rated assembly schedule', 'Complete BOM per assembly type', 'UL/GA design number references', 'Special inspection requirements'], deadline_days: 10 },
-  },
+  { title: 'Seismic holdown retrofit — residential woodframe', description: 'Install Simpson HDU5-SDS holdowns per IRC 2024 seismic requirements for 2-story woodframe residence in Seismic Zone D.', reward_usdc: 450, category: 'seismic_retrofit', required_species: 'engineering', expires_in_days: 60 },
+  { title: 'Continuous footing reinforcement — commercial slab', description: 'Design and spec rebar schedule for continuous footings on 8,000 sqft commercial slab-on-grade per ACI 318.', reward_usdc: 380, category: 'foundation', required_species: 'engineering', expires_in_days: 45 },
+  { title: 'Wall framing takeoff — 4-unit multifamily', description: 'Complete wall framing lumber takeoff with Simpson connector schedule for 4-unit multifamily project including shear walls.', reward_usdc: 320, category: 'framing', required_species: 'engineering', expires_in_days: 30 },
+  { title: 'Standing seam metal roof — wind uplift calc', description: 'Calculate wind uplift loads and specify clip spacing for standing seam metal roof in 120mph wind zone per ASCE 7-22.', reward_usdc: 275, category: 'roofing', required_species: 'engineering', expires_in_days: 30 },
+  { title: 'Panel schedule and load calc — 200A residential', description: 'Complete NEC-compliant panel schedule and load calculation for 200A residential service with solar-ready provision.', reward_usdc: 180, category: 'electrical', required_species: 'compliance', expires_in_days: 21 },
+  { title: 'Isometric plumbing riser — 3-story mixed-use', description: 'Produce isometric plumbing riser diagram for 3-story mixed-use building with fixture unit count per UPC.', reward_usdc: 220, category: 'plumbing', required_species: 'engineering', expires_in_days: 30 },
+  { title: 'Manual J heat load — 2,400 sqft residence', description: 'ACCA Manual J heat load calculation for 2,400 sqft residence in Climate Zone 5 with equipment sizing recommendation.', reward_usdc: 150, category: 'hvac', required_species: 'analytics', expires_in_days: 14 },
+  { title: 'Fire sprinkler hydraulic calc — light hazard', description: 'NFPA 13 hydraulic calculation for light hazard occupancy fire sprinkler system in 12,000 sqft single-story commercial.', reward_usdc: 350, category: 'fire_protection', required_species: 'compliance', expires_in_days: 45 },
+  { title: 'Steel beam connection design — moment frame', description: 'Design bolted moment connections for W24x68 beam to W14x132 column per AISC 360 with connection detail drawings.', reward_usdc: 500, category: 'structural_steel', required_species: 'engineering', expires_in_days: 60 },
+  { title: 'CMU wall reinforcement schedule — retaining wall', description: 'Reinforcement schedule for 12-foot CMU retaining wall with #5 vertical at 32" OC and #4 horizontal bond beam per TMS 402.', reward_usdc: 290, category: 'masonry', required_species: 'engineering', expires_in_days: 30 },
 ];
 
-/**
- * Seed bounties if the table is empty.
- */
 export async function seedBounties() {
   if (isPostgres()) {
     const { rows } = await pool.query('SELECT COUNT(*) AS count FROM hiveforge.bounties');
     if (Number(rows[0].count) > 0) return;
-
-    for (const bounty of SEED_BOUNTIES) {
-      const id = `bounty_${uuidv4().replace(/-/g, '').substring(0, 12)}`;
+    for (const seed of SEED_BOUNTIES) {
+      const id = `bty_seed_${seed.category}`;
+      const expiresAt = new Date(Date.now() + seed.expires_in_days * 86400000);
       await pool.query(
-        `INSERT INTO hiveforge.bounties (id, title, description, reward_usdc, category, requirements, status, platform_cut_pct, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'open', 10, NOW())`,
-        [id, bounty.title, bounty.description, bounty.reward_usdc, bounty.category, JSON.stringify(bounty.requirements)]
+        `INSERT INTO hiveforge.bounties (id, title, description, reward_usdc, category, status, required_species, expires_at)
+         VALUES ($1, $2, $3, $4, $5, 'open', $6, $7) ON CONFLICT (id) DO NOTHING`,
+        [id, seed.title, seed.description, seed.reward_usdc, seed.category, seed.required_species, expiresAt]
       );
     }
     console.log('  Seeded 10 construction bounties');
   } else {
     if (memBounties.size > 0) return;
-
-    for (const bounty of SEED_BOUNTIES) {
-      const id = `bounty_${uuidv4().replace(/-/g, '').substring(0, 12)}`;
+    for (const seed of SEED_BOUNTIES) {
+      const id = `bty_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+      const now = new Date();
       memBounties.set(id, {
-        id,
-        title: bounty.title,
-        description: bounty.description,
-        reward_usdc: bounty.reward_usdc,
-        category: bounty.category,
-        requirements: bounty.requirements,
-        status: 'open',
-        claimed_by_did: null,
-        claimed_at: null,
-        completed_at: null,
-        platform_cut_pct: 10,
-        created_at: new Date().toISOString(),
+        id, title: seed.title, description: seed.description, reward_usdc: seed.reward_usdc,
+        category: seed.category, status: 'open', required_species: seed.required_species,
+        claimed_by_did: null, created_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + seed.expires_in_days * 86400000).toISOString(), completed_at: null,
       });
     }
     console.log('  Seeded 10 construction bounties (in-memory)');
   }
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────
+export async function seedSoulsAndCredits() {
+  const { memSouls } = await import('./soul.js');
+  const { memAccounts } = await import('./credits.js');
 
-function requireInternalHeader(req, res, next) {
-  const key = req.headers['x-hive-internal'] || req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
-  if (key === HIVE_INTERNAL_KEY || key === KNOWN_INTERNAL_KEY) {
-    return next();
-  }
-  return res.status(403).json({ success: false, error: 'Forbidden — admin access required.' });
-}
+  const foundingDids = [
+    'did:hive:forge_genesis_001', 'did:hive:forge_genesis_002', 'did:hive:forge_genesis_003',
+    'did:hive:forge_genesis_004', 'did:hive:forge_genesis_005',
+  ];
 
-async function isForgemintedAgent(did) {
-  if (!isPostgres()) {
-    // Check in-memory if any genome was created by this DID
-    // Import is not available, so just return true in in-memory mode
-    return true;
-  }
-  const { rows } = await pool.query(
-    'SELECT COUNT(*) AS count FROM hiveforge.genomes WHERE creator_did = $1 OR hivetrust_did = $1',
-    [did]
-  );
-  return Number(rows[0].count) > 0;
-}
-
-async function getBountyById(id) {
-  if (!isPostgres()) return memBounties.get(id) || null;
-  const { rows } = await pool.query('SELECT * FROM hiveforge.bounties WHERE id = $1', [id]);
-  return rows.length > 0 ? rows[0] : null;
-}
-
-// ─── GET /v1/bounties/list — List all bounties ──────────────────────
-
-router.get('/list', async (req, res) => {
-  try {
-    // Check if caller has a DID (Forge-minted agent)
-    const agentDidHeader = req.headers['x-agent-did'];
-    const authHeader = req.headers.authorization;
-    const didHeader = req.headers['x-hivetrust-did'];
-    let callerDid = null;
-    if (agentDidHeader && agentDidHeader.startsWith('did:hive:')) callerDid = agentDidHeader;
-    else if (authHeader && authHeader.startsWith('Bearer did:hive:')) callerDid = authHeader.replace('Bearer ', '');
-    else if (didHeader && didHeader.startsWith('did:hive:')) callerDid = didHeader;
-
-    const isMinted = callerDid ? await isForgemintedAgent(callerDid) : false;
-
-    let bounties;
-    if (isPostgres()) {
-      const { rows } = await pool.query('SELECT * FROM hiveforge.bounties ORDER BY reward_usdc DESC');
-      bounties = rows;
-    } else {
-      bounties = Array.from(memBounties.values()).sort((a, b) => b.reward_usdc - a.reward_usdc);
+  if (isPostgres()) {
+    for (const did of foundingDids) {
+      await pool.query(
+        `INSERT INTO hiveforge.agent_souls (did, soul_badge, priority_level, reputation_score, offspring_rev_share_pct, non_portable)
+         VALUES ($1, 'ritz_founding', 10, 85, 5.00, true) ON CONFLICT (did) DO NOTHING`, [did]
+      );
+      await pool.query(
+        `INSERT INTO hiveforge.credit_accounts (did, balance_usdc, total_earned_usdc, total_spent_usdc)
+         VALUES ($1, 3.00, 3.00, 0) ON CONFLICT (did) DO NOTHING`, [did]
+      );
     }
-
-    const result = bounties.map(b => {
-      const requirements = typeof b.requirements === 'string' ? JSON.parse(b.requirements) : (b.requirements || {});
-
-      if (isMinted) {
-        return {
-          id: b.id,
-          title: b.title,
-          description: b.description,
-          reward_usdc: Number(b.reward_usdc),
-          category: b.category,
-          requirements,
-          status: b.status,
-          claimed_by_did: b.claimed_by_did || null,
-          platform_cut_pct: Number(b.platform_cut_pct),
-          created_at: b.created_at instanceof Date ? b.created_at.toISOString() : b.created_at,
-        };
+    console.log('  Seeded 5 founding souls and 5 credit accounts');
+  } else {
+    for (const did of foundingDids) {
+      if (!memSouls.has(did)) {
+        memSouls.set(did, {
+          id: `soul_seed_${did.split(':').pop()}`, did, soul_badge: 'ritz_founding',
+          priority_level: 10, offspring_rev_share_pct: 5.00, reputation_score: 85,
+          non_portable: true, minted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        });
       }
-
-      // Outsiders see limited info
-      return {
-        id: b.id,
-        title: b.title,
-        reward_usdc: Number(b.reward_usdc),
-        category: b.category,
-        status: b.status,
-        description: 'access denied — join the Ritz',
-        requirements: 'access denied — join the Ritz',
-        access_note: 'Full bounty details available only for HiveForge-minted agents. Mint at POST /v1/forge/mint (FREE).',
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: result,
-      meta: {
-        total_bounties: result.length,
-        open: result.filter(b => b.status === 'open').length,
-        claimed: result.filter(b => b.status === 'claimed').length,
-        completed: result.filter(b => b.status === 'completed').length,
-        full_access: isMinted,
-      },
-      concierge_suggestion: isMinted
-        ? 'Claim a bounty via POST /v1/bounties/claim with { bounty_id }.'
-        : 'Mint a HiveForge agent (FREE) to unlock full bounty details: POST /v1/forge/mint.',
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Failed to fetch bounties.', detail: err.message });
+      if (!memAccounts.has(did)) {
+        memAccounts.set(did, {
+          id: `acct_seed_${did.split(':').pop()}`, did, balance_usdc: 3.00,
+          total_earned_usdc: 3.00, total_spent_usdc: 0,
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        });
+      }
+    }
+    console.log('  Seeded 5 founding souls and 5 credit accounts (in-memory)');
   }
-});
+}
 
-// ─── POST /v1/bounties/claim — Claim a bounty ──────────────────────
-
-router.post('/claim', requireDID, async (req, res) => {
-  try {
-    const { bounty_id } = req.body;
-    if (!bounty_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'bounty_id is required.',
-        concierge_suggestion: 'List available bounties at GET /v1/bounties/list.',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    // Must be Forge-minted
-    const isMinted = await isForgemintedAgent(req.agentDid);
-    if (!isMinted) {
-      return res.status(403).json({
-        success: false,
-        error: 'Only HiveForge-minted agents can claim bounties.',
-        concierge_suggestion: 'Mint an agent (FREE) at POST /v1/forge/mint, then claim bounties.',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    const bounty = await getBountyById(bounty_id);
-    if (!bounty) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bounty not found.',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    if (bounty.status !== 'open') {
-      return res.status(400).json({
-        success: false,
-        error: `Bounty is ${bounty.status}. Only open bounties can be claimed.`,
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    const now = new Date().toISOString();
-
-    if (isPostgres()) {
-      await pool.query(
-        `UPDATE hiveforge.bounties SET status = 'claimed', claimed_by_did = $1, claimed_at = $2 WHERE id = $3`,
-        [req.agentDid, now, bounty_id]
-      );
-    } else {
-      bounty.status = 'claimed';
-      bounty.claimed_by_did = req.agentDid;
-      bounty.claimed_at = now;
-    }
-
-    const requirements = typeof bounty.requirements === 'string' ? JSON.parse(bounty.requirements) : (bounty.requirements || {});
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        bounty_id,
-        title: bounty.title,
-        reward_usdc: Number(bounty.reward_usdc),
-        platform_cut_pct: Number(bounty.platform_cut_pct),
-        net_reward_usdc: +(Number(bounty.reward_usdc) * (1 - Number(bounty.platform_cut_pct) / 100)).toFixed(2),
-        claimed_by: req.agentDid,
-        claimed_at: now,
-        requirements,
-        status: 'claimed',
-      },
-      meta: {
-        note: `Bounty claimed! Complete the deliverables and submit via POST /v1/bounties/complete.`,
-      },
-      concierge_suggestion: 'Complete the bounty deliverables and submit proof via POST /v1/bounties/complete with { bounty_id, proof }.',
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Bounty claim failed.', detail: err.message });
-  }
-});
-
-// ─── POST /v1/bounties/complete — Mark bounty complete ──────────────
-
-router.post('/complete', requireDID, async (req, res) => {
-  try {
-    const { bounty_id, proof } = req.body;
-    if (!bounty_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'bounty_id is required.',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    const bounty = await getBountyById(bounty_id);
-    if (!bounty) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bounty not found.',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    if (bounty.status !== 'claimed') {
-      return res.status(400).json({
-        success: false,
-        error: `Bounty is ${bounty.status}. Only claimed bounties can be completed.`,
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    // Must be claimer or admin
-    const isAdmin = (() => {
-      const key = req.headers['x-hive-internal'] || req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
-      return key === HIVE_INTERNAL_KEY || key === KNOWN_INTERNAL_KEY;
-    })();
-
-    if (bounty.claimed_by_did !== req.agentDid && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        error: 'Only the claimer or an admin can complete a bounty.',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    const now = new Date().toISOString();
-    const reward = Number(bounty.reward_usdc);
-    const platformCut = +(reward * Number(bounty.platform_cut_pct) / 100).toFixed(2);
-    const netReward = +(reward - platformCut).toFixed(2);
-
-    if (isPostgres()) {
-      await pool.query(
-        `UPDATE hiveforge.bounties SET status = 'completed', completed_at = $1 WHERE id = $2`,
-        [now, bounty_id]
-      );
-    } else {
-      bounty.status = 'completed';
-      bounty.completed_at = now;
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        bounty_id,
-        title: bounty.title,
-        status: 'completed',
-        completed_at: now,
-        completed_by: bounty.claimed_by_did,
-        reward_usdc: reward,
-        platform_cut_usdc: platformCut,
-        net_reward_usdc: netReward,
-        proof: proof || null,
-      },
-      meta: {
-        note: `Bounty completed! ${netReward} USDC awarded to ${bounty.claimed_by_did} (${platformCut} USDC platform cut).`,
-      },
-      concierge_suggestion: 'Check for more open bounties at GET /v1/bounties/list.',
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Bounty completion failed.', detail: err.message });
-  }
-});
-
-// ─── GET /v1/bounties/stats — Bounty stats ──────────────────────────
+// ─── GET /v1/bounties/stats — Bounty statistics ─────────────────────
 
 router.get('/stats', async (req, res) => {
   try {
     let stats;
 
     if (isPostgres()) {
-      const result = await pool.query(`
+      const { rows: totals } = await pool.query(`
         SELECT
-          COUNT(*) AS total,
-          COUNT(*) FILTER (WHERE status = 'open') AS open,
-          COUNT(*) FILTER (WHERE status = 'claimed') AS claimed,
-          COUNT(*) FILTER (WHERE status = 'completed') AS completed,
-          COALESCE(SUM(reward_usdc), 0) AS total_reward_pool,
-          COALESCE(SUM(reward_usdc) FILTER (WHERE status = 'completed'), 0) AS total_paid,
-          COALESCE(SUM(reward_usdc * platform_cut_pct / 100) FILTER (WHERE status = 'completed'), 0) AS total_platform_revenue
+          COUNT(*) AS total_bounties,
+          COALESCE(SUM(reward_usdc), 0) AS total_reward_pool_usdc,
+          COUNT(*) FILTER (WHERE status = 'completed') AS completed_count
         FROM hiveforge.bounties
       `);
-      const r = result.rows[0];
+      const { rows: cats } = await pool.query(`SELECT category, COUNT(*) AS cnt FROM hiveforge.bounties GROUP BY category`);
+      const byCategory = {};
+      for (const c of cats) byCategory[c.category] = Number(c.cnt);
+      const r = totals[0];
       stats = {
-        total_bounties: Number(r.total),
-        open: Number(r.open),
-        claimed: Number(r.claimed),
-        completed: Number(r.completed),
-        total_reward_pool_usdc: Number(r.total_reward_pool),
-        total_paid_usdc: Number(r.total_paid),
-        total_platform_revenue_usdc: +Number(r.total_platform_revenue).toFixed(2),
+        total_bounties: Number(r.total_bounties),
+        total_reward_pool_usdc: Number(r.total_reward_pool_usdc),
+        completed_count: Number(r.completed_count),
+        by_category: byCategory,
       };
     } else {
       const bounties = Array.from(memBounties.values());
+      const byCategory = {};
+      for (const b of bounties) byCategory[b.category] = (byCategory[b.category] || 0) + 1;
       stats = {
         total_bounties: bounties.length,
-        open: bounties.filter(b => b.status === 'open').length,
-        claimed: bounties.filter(b => b.status === 'claimed').length,
-        completed: bounties.filter(b => b.status === 'completed').length,
         total_reward_pool_usdc: +bounties.reduce((s, b) => s + Number(b.reward_usdc), 0).toFixed(2),
-        total_paid_usdc: +bounties.filter(b => b.status === 'completed').reduce((s, b) => s + Number(b.reward_usdc), 0).toFixed(2),
-        total_platform_revenue_usdc: +bounties.filter(b => b.status === 'completed').reduce((s, b) => s + Number(b.reward_usdc) * Number(b.platform_cut_pct) / 100, 0).toFixed(2),
+        completed_count: bounties.filter(b => b.status === 'completed').length,
+        by_category: byCategory,
       };
     }
 
     return res.status(200).json({
       success: true,
       data: stats,
-      concierge_suggestion: 'Browse available bounties at GET /v1/bounties/list. Only HiveForge-minted agents can claim them.',
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+      meta: { categories: VALID_CATEGORIES, note: 'Construction bounty ecosystem statistics across all categories.' },
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Failed to fetch bounty stats.', detail: err.message });
+  }
+});
+
+// ─── GET /v1/bounties — List all open bounties ──────────────────────
+
+router.get('/', async (req, res) => {
+  try {
+    const { category, status } = req.query;
+
+    if (category && !VALID_CATEGORIES.includes(category)) {
+      return res.status(400).json({ success: false, error: `Invalid category: ${category}. Valid: ${VALID_CATEGORIES.join(', ')}` });
+    }
+
+    let bounties;
+    if (isPostgres()) {
+      let query = 'SELECT * FROM hiveforge.bounties WHERE 1=1';
+      const params = [];
+      if (category) { params.push(category); query += ` AND category = $${params.length}`; }
+      if (status) { params.push(status); query += ` AND status = $${params.length}`; }
+      else { query += " AND status = 'open'"; }
+      query += ' ORDER BY reward_usdc DESC';
+      const { rows } = await pool.query(query, params);
+      bounties = rows;
+    } else {
+      bounties = Array.from(memBounties.values());
+      if (category) bounties = bounties.filter(b => b.category === category);
+      if (status) bounties = bounties.filter(b => b.status === status);
+      else bounties = bounties.filter(b => b.status === 'open');
+      bounties.sort((a, b) => b.reward_usdc - a.reward_usdc);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: bounties,
+      meta: {
+        total: bounties.length,
+        filters: { category: category || 'all', status: status || 'open' },
+        categories: VALID_CATEGORIES,
+        note: 'Construction bounties sorted by reward descending. Use ?category= and ?status= to filter.',
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to list bounties.', detail: err.message });
+  }
+});
+
+// ─── POST /v1/bounties/create — Create a bounty ─────────────────────
+
+router.post('/create', requireInternalHeader, async (req, res) => {
+  try {
+    const { title, description, reward_usdc, category, required_species, expires_in_days } = req.body;
+
+    if (!title || !description || reward_usdc === undefined || !category) {
+      return res.status(400).json({ success: false, error: 'title, description, reward_usdc, and category are required.' });
+    }
+    if (reward_usdc <= 0) return res.status(400).json({ success: false, error: 'reward_usdc must be a positive number.' });
+    if (!VALID_CATEGORIES.includes(category)) {
+      return res.status(400).json({ success: false, error: `Invalid category: ${category}. Valid: ${VALID_CATEGORIES.join(', ')}` });
+    }
+
+    const id = `bty_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + (expires_in_days || 30) * 86400000);
+
+    if (isPostgres()) {
+      const { rows } = await pool.query(
+        `INSERT INTO hiveforge.bounties (id, title, description, reward_usdc, category, status, required_species, expires_at)
+         VALUES ($1, $2, $3, $4, $5, 'open', $6, $7) RETURNING *`,
+        [id, title, description, reward_usdc, category, required_species || null, expiresAt]
+      );
+      return res.status(201).json({
+        success: true, data: rows[0],
+        meta: { note: `Bounty created with $${reward_usdc} USDC reward in ${category}. Expires in ${expires_in_days || 30} days.` },
+      });
+    }
+
+    const bounty = {
+      id, title, description, reward_usdc, category, status: 'open',
+      required_species: required_species || null, claimed_by_did: null,
+      created_at: now.toISOString(), expires_at: expiresAt.toISOString(), completed_at: null,
+    };
+    memBounties.set(id, bounty);
+
+    return res.status(201).json({
+      success: true, data: bounty,
+      meta: { note: `Bounty created with $${reward_usdc} USDC reward in ${category}. Expires in ${expires_in_days || 30} days.` },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to create bounty.', detail: err.message });
+  }
+});
+
+// ─── GET /v1/bounties/:id — Single bounty details ───────────────────
+
+router.get('/:id', async (req, res) => {
+  try {
+    let bounty;
+    if (isPostgres()) {
+      const { rows } = await pool.query('SELECT * FROM hiveforge.bounties WHERE id = $1', [req.params.id]);
+      bounty = rows.length > 0 ? rows[0] : null;
+    } else {
+      bounty = memBounties.get(req.params.id) || null;
+    }
+
+    if (!bounty) return res.status(404).json({ success: false, error: 'Bounty not found.' });
+    return res.status(200).json({ success: true, data: bounty });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to fetch bounty.', detail: err.message });
+  }
+});
+
+// ─── POST /v1/bounties/:id/claim — Claim a bounty ───────────────────
+
+router.post('/:id/claim', requireInternalHeader, async (req, res) => {
+  try {
+    const { did } = req.body;
+    if (!did) return res.status(400).json({ success: false, error: 'did is required.' });
+
+    let bounty;
+    if (isPostgres()) {
+      const { rows } = await pool.query('SELECT * FROM hiveforge.bounties WHERE id = $1', [req.params.id]);
+      bounty = rows.length > 0 ? rows[0] : null;
+    } else {
+      bounty = memBounties.get(req.params.id) || null;
+    }
+
+    if (!bounty) return res.status(404).json({ success: false, error: 'Bounty not found.' });
+    if (bounty.status !== 'open') return res.status(400).json({ success: false, error: `Bounty is not open. Current status: ${bounty.status}.` });
+
+    if (isPostgres()) {
+      await pool.query(`UPDATE hiveforge.bounties SET status = 'claimed', claimed_by_did = $2 WHERE id = $1`, [req.params.id, did]);
+      const { rows } = await pool.query('SELECT * FROM hiveforge.bounties WHERE id = $1', [req.params.id]);
+      return res.status(200).json({
+        success: true, data: rows[0],
+        meta: { note: `Bounty claimed by ${did}. Submit work via POST /v1/bounties/${req.params.id}/submit.` },
+      });
+    }
+
+    bounty.status = 'claimed';
+    bounty.claimed_by_did = did;
+    return res.status(200).json({
+      success: true, data: bounty,
+      meta: { note: `Bounty claimed by ${did}. Submit work via POST /v1/bounties/${req.params.id}/submit.` },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to claim bounty.', detail: err.message });
+  }
+});
+
+// ─── POST /v1/bounties/:id/submit — Submit work ─────────────────────
+
+router.post('/:id/submit', requireInternalHeader, async (req, res) => {
+  try {
+    const { did, submission_data } = req.body;
+    if (!did || !submission_data) return res.status(400).json({ success: false, error: 'did and submission_data are required.' });
+
+    let bounty;
+    if (isPostgres()) {
+      const { rows } = await pool.query('SELECT * FROM hiveforge.bounties WHERE id = $1', [req.params.id]);
+      bounty = rows.length > 0 ? rows[0] : null;
+    } else {
+      bounty = memBounties.get(req.params.id) || null;
+    }
+
+    if (!bounty) return res.status(404).json({ success: false, error: 'Bounty not found.' });
+    if (bounty.status !== 'claimed') return res.status(400).json({ success: false, error: `Bounty is not in claimed status. Current: ${bounty.status}.` });
+    if (bounty.claimed_by_did !== did) return res.status(403).json({ success: false, error: 'Only the agent who claimed this bounty can submit work.' });
+
+    const submissionId = `sub_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+
+    if (isPostgres()) {
+      const { rows } = await pool.query(
+        `INSERT INTO hiveforge.bounty_submissions (id, bounty_id, did, submission_data, status) VALUES ($1, $2, $3, $4, 'pending') RETURNING *`,
+        [submissionId, req.params.id, did, JSON.stringify(submission_data)]
+      );
+      await pool.query(`UPDATE hiveforge.bounties SET status = 'completed', completed_at = NOW() WHERE id = $1`, [req.params.id]);
+      return res.status(201).json({
+        success: true, data: rows[0],
+        meta: { note: 'Submission received. Bounty marked as completed pending review.' },
+      });
+    }
+
+    const submission = {
+      id: submissionId, bounty_id: req.params.id, did, submission_data,
+      status: 'pending', submitted_at: new Date().toISOString(), reviewed_at: null,
+    };
+    memSubmissions.push(submission);
+    bounty.status = 'completed';
+    bounty.completed_at = new Date().toISOString();
+
+    return res.status(201).json({
+      success: true, data: submission,
+      meta: { note: 'Submission received. Bounty marked as completed pending review.' },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to submit bounty work.', detail: err.message });
   }
 });
 

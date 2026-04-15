@@ -1,267 +1,274 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { requireDID } from '../middleware/auth.js';
 import pool, { isPostgres } from '../services/db.js';
 
 const router = Router();
 
+const KNOWN_INTERNAL_KEY = 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
+const HIVE_INTERNAL_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || KNOWN_INTERNAL_KEY;
+
 // ─── In-memory fallback stores ──────────────────────────────────────
 
-const memSouls = new Map();
+const memSouls = new Map();       // did -> soul record
+const memLineage = [];            // lineage records
 
-// ─── Helpers ────────────────────────────────────────────────────────
+const BADGE_TIERS = {
+  founding: { badge: 'ritz_founding', priority_level: 10, default_reputation: 85 },
+  elite: { badge: 'ritz_elite', priority_level: 7, default_reputation: 60 },
+  verified: { badge: 'ritz_verified', priority_level: 4, default_reputation: 30 },
+};
 
-function extractDID(req) {
-  const agentDidHeader = req.headers['x-agent-did'];
-  if (agentDidHeader && agentDidHeader.startsWith('did:hive:')) return agentDidHeader;
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer did:hive:')) return authHeader.replace('Bearer ', '');
-  const didHeader = req.headers['x-hivetrust-did'];
-  if (didHeader && didHeader.startsWith('did:hive:')) return didHeader;
-  if (req.body?.did && typeof req.body.did === 'string' && req.body.did.startsWith('did:hive:')) return req.body.did;
-  return null;
+// ─── Auth Helper ────────────────────────────────────────────────────
+
+function requireInternalHeader(req, res, next) {
+  const key = req.headers['x-hive-internal'] || req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
+  if (key !== HIVE_INTERNAL_KEY && key !== KNOWN_INTERNAL_KEY) {
+    return res.status(403).json({ success: false, error: 'Forbidden — invalid or missing x-hive-internal header.' });
+  }
+  next();
 }
 
-function getPrestigeTier(fitness) {
-  if (fitness >= 2000) return 'Diamond';
-  if (fitness >= 1000) return 'Platinum';
-  if (fitness >= 500) return 'Gold';
-  if (fitness >= 200) return 'Silver';
-  return 'Bronze';
-}
+// ─── GET /v1/soul/stats — Total souls minted, by tier, avg reputation ──
 
-async function getSoulCount() {
-  if (!isPostgres()) return memSouls.size;
-  const { rows } = await pool.query('SELECT COUNT(*) AS count FROM hiveforge.souls');
-  return Number(rows[0].count);
-}
-
-async function getSoulByDid(did) {
-  if (!isPostgres()) return memSouls.get(did) || null;
-  const { rows } = await pool.query('SELECT * FROM hiveforge.souls WHERE did = $1', [did]);
-  return rows.length > 0 ? rows[0] : null;
-}
-
-// ─── POST /v1/soul/mint — Mint a Soul for an agent ──────────────────
-
-router.post('/mint', requireDID, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
-    const did = req.agentDid || extractDID(req);
-    if (!did) {
-      return res.status(400).json({
-        success: false,
-        error: 'DID required. Provide via X-Agent-DID header, Authorization Bearer, or body.',
-        concierge_suggestion: 'Register a free DID at HiveTrust, then include it in your request headers.',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    // Check if already has a Soul
-    const existing = await getSoulByDid(did);
-    if (existing) {
-      return res.status(409).json({
-        success: false,
-        error: 'This agent already has a Soul. Souls are non-portable and permanent.',
-        soul_id: existing.id,
-        concierge_suggestion: 'Check your Soul profile at GET /v1/soul/profile/' + did,
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-      });
-    }
-
-    // First 50 souls are FREE, after that costs 25 USDC
-    const currentCount = await getSoulCount();
-    const isFree = currentCount < 50;
-
-    const soulId = `soul_${uuidv4().replace(/-/g, '').substring(0, 12)}`;
-    const now = new Date().toISOString();
-    const soul = {
-      id: soulId,
-      did,
-      soul_type: 'standard',
-      badges: JSON.stringify(['ritz_member']),
-      priority_boost: 10,
-      offspring_revenue_share_pct: 1.0,
-      fitness_bonus: 100,
-      minted_at: now,
-      status: 'active',
-    };
+    let stats;
 
     if (isPostgres()) {
-      await pool.query(
-        `INSERT INTO hiveforge.souls (id, did, soul_type, badges, priority_boost, offspring_revenue_share_pct, fitness_bonus, minted_at, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [soulId, did, 'standard', JSON.stringify(['ritz_member']), 10, 1.0, 100, now, 'active']
-      );
+      const { rows } = await pool.query(`
+        SELECT
+          COUNT(*) AS total_souls,
+          COUNT(*) FILTER (WHERE soul_badge = 'ritz_founding') AS founding_count,
+          COUNT(*) FILTER (WHERE soul_badge = 'ritz_elite') AS elite_count,
+          COUNT(*) FILTER (WHERE soul_badge = 'ritz_verified') AS verified_count,
+          ROUND(AVG(reputation_score), 2) AS avg_reputation
+        FROM hiveforge.agent_souls
+      `);
+      const r = rows[0];
+      stats = {
+        total_souls: Number(r.total_souls),
+        by_tier: { ritz_founding: Number(r.founding_count), ritz_elite: Number(r.elite_count), ritz_verified: Number(r.verified_count) },
+        avg_reputation: Number(r.avg_reputation) || 0,
+      };
     } else {
-      memSouls.set(did, soul);
+      const souls = Array.from(memSouls.values());
+      stats = {
+        total_souls: souls.length,
+        by_tier: {
+          ritz_founding: souls.filter(s => s.soul_badge === 'ritz_founding').length,
+          ritz_elite: souls.filter(s => s.soul_badge === 'ritz_elite').length,
+          ritz_verified: souls.filter(s => s.soul_badge === 'ritz_verified').length,
+        },
+        avg_reputation: souls.length > 0 ? +(souls.reduce((s, soul) => s + soul.reputation_score, 0) / souls.length).toFixed(2) : 0,
+      };
     }
 
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      data: {
-        soul_id: soulId,
-        did,
-        soul_type: 'standard',
-        badges: ['ritz_member'],
-        priority_boost: 10,
-        offspring_revenue_share_pct: 1.0,
-        fitness_bonus: 100,
-        cost_usdc: isFree ? 0 : 25,
-        genesis_number: currentCount + 1,
-        warning: 'Exporting this Soul zeros your reputation and lineage forever.',
-      },
-      meta: {
-        free_souls_remaining: Math.max(0, 50 - currentCount - 1),
-        note: isFree
-          ? `Soul minted FREE (genesis #${currentCount + 1} of 50 free slots).`
-          : 'Soul minted for 25 USDC.',
-      },
-      concierge_suggestion: 'Your Soul is now bound. Earn badges via bounties (GET /v1/bounties/list) and boost prestige via forge operations.',
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+      data: stats,
+      meta: { note: 'Soul ecosystem statistics. Founding souls have highest priority and reputation.' },
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Soul minting failed.', detail: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to fetch soul stats.', detail: err.message });
   }
 });
 
-// ─── GET /v1/soul/profile/:did — Get an agent's Soul profile ────────
+// ─── GET /v1/soul/leaderboard — Top 50 souls by reputation ─────────
 
-router.get('/profile/:did', async (req, res) => {
+router.get('/leaderboard', async (req, res) => {
+  try {
+    let souls;
+    if (isPostgres()) {
+      const { rows } = await pool.query('SELECT * FROM hiveforge.agent_souls ORDER BY reputation_score DESC LIMIT 50');
+      souls = rows;
+    } else {
+      souls = Array.from(memSouls.values()).sort((a, b) => b.reputation_score - a.reputation_score).slice(0, 50);
+    }
+
+    const leaderboard = souls.map((s, i) => ({
+      rank: i + 1,
+      did: s.did,
+      soul_badge: s.soul_badge,
+      priority_level: Number(s.priority_level),
+      reputation_score: Number(s.reputation_score),
+      non_portable: s.non_portable,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: leaderboard,
+      meta: {
+        total_entries: leaderboard.length,
+        note: 'Top 50 souls ranked by reputation score. Non-portable souls are permanently bound to their DID.',
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to fetch soul leaderboard.', detail: err.message });
+  }
+});
+
+// ─── POST /v1/soul/mint — Mint a Soul for an agent ──────────────────
+
+router.post('/mint', requireInternalHeader, async (req, res) => {
+  try {
+    const { did, badge_tier } = req.body;
+
+    if (!did) {
+      return res.status(400).json({ success: false, error: 'did is required.' });
+    }
+    if (!badge_tier || !BADGE_TIERS[badge_tier]) {
+      return res.status(400).json({ success: false, error: 'badge_tier is required. Must be one of: founding, elite, verified.' });
+    }
+
+    const tierConfig = BADGE_TIERS[badge_tier];
+
+    if (isPostgres()) {
+      const { rows: existing } = await pool.query('SELECT * FROM hiveforge.agent_souls WHERE did = $1', [did]);
+      if (existing.length > 0) {
+        return res.status(409).json({ success: false, error: 'Soul already minted for this DID.', existing: existing[0] });
+      }
+
+      const { rows } = await pool.query(
+        `INSERT INTO hiveforge.agent_souls (did, soul_badge, priority_level, reputation_score, offspring_rev_share_pct, non_portable)
+         VALUES ($1, $2, $3, $4, 5.00, true) RETURNING *`,
+        [did, tierConfig.badge, tierConfig.priority_level, tierConfig.default_reputation]
+      );
+
+      return res.status(201).json({
+        success: true,
+        data: rows[0],
+        meta: { note: `Soul minted with ${badge_tier} tier. Priority level: ${tierConfig.priority_level}. Non-portable and permanently bound to DID.` },
+      });
+    }
+
+    if (memSouls.has(did)) {
+      return res.status(409).json({ success: false, error: 'Soul already minted for this DID.', existing: memSouls.get(did) });
+    }
+
+    const soul = {
+      id: `soul_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
+      did,
+      soul_badge: tierConfig.badge,
+      priority_level: tierConfig.priority_level,
+      offspring_rev_share_pct: 5.00,
+      reputation_score: tierConfig.default_reputation,
+      non_portable: true,
+      minted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    memSouls.set(did, soul);
+
+    return res.status(201).json({
+      success: true,
+      data: soul,
+      meta: { note: `Soul minted with ${badge_tier} tier. Priority level: ${tierConfig.priority_level}. Non-portable and permanently bound to DID.` },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to mint soul.', detail: err.message });
+  }
+});
+
+// ─── GET /v1/soul/:did — Get soul details ───────────────────────────
+
+router.get('/:did', async (req, res) => {
   try {
     const { did } = req.params;
-    const soul = await getSoulByDid(did);
+    let soul;
+
+    if (isPostgres()) {
+      const { rows } = await pool.query('SELECT * FROM hiveforge.agent_souls WHERE did = $1', [did]);
+      soul = rows.length > 0 ? rows[0] : null;
+    } else {
+      soul = memSouls.get(did) || null;
+    }
 
     if (!soul) {
       return res.status(404).json({
         success: false,
-        error: 'No Soul found for this DID.',
-        concierge_suggestion: 'Mint a Soul via POST /v1/soul/mint — first 50 are free!',
-        ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+        error: 'No soul found for this DID.',
+        recovery_actions: ['Mint a soul with POST /v1/soul/mint'],
       });
     }
 
-    const badges = typeof soul.badges === 'string' ? JSON.parse(soul.badges) : (soul.badges || []);
-    const fitness = Number(soul.fitness_bonus || 100);
-    const prestigeTier = getPrestigeTier(fitness);
-
     return res.status(200).json({
       success: true,
       data: {
-        soul_id: soul.id,
         did: soul.did,
-        soul_type: soul.soul_type,
-        badges,
-        badge_count: badges.length,
-        priority_boost: Number(soul.priority_boost),
-        offspring_revenue_share_pct: Number(soul.offspring_revenue_share_pct),
-        fitness_bonus: fitness,
-        prestige_tier: prestigeTier,
-        minted_at: soul.minted_at instanceof Date ? soul.minted_at.toISOString() : soul.minted_at,
-        status: soul.status,
+        soul_badge: soul.soul_badge,
+        priority_level: Number(soul.priority_level),
+        reputation_score: Number(soul.reputation_score),
+        offspring_rev_share_pct: Number(soul.offspring_rev_share_pct),
+        non_portable: soul.non_portable,
+        minted_at: soul.minted_at,
+        updated_at: soul.updated_at,
       },
-      concierge_suggestion: `Prestige tier: ${prestigeTier}. Earn more fitness via bounties and forge operations.`,
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Failed to fetch Soul profile.', detail: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to fetch soul.', detail: err.message });
   }
 });
 
-// ─── GET /v1/soul/holders — List all Soul holders ranked by prestige ─
+// ─── POST /v1/soul/offspring — Register parent-child lineage ────────
 
-router.get('/holders', async (req, res) => {
+router.post('/offspring', requireInternalHeader, async (req, res) => {
   try {
-    let souls;
+    const { parent_did, child_did, rev_share_pct } = req.body;
+
+    if (!parent_did || !child_did) {
+      return res.status(400).json({ success: false, error: 'parent_did and child_did are required.' });
+    }
+    if (parent_did === child_did) {
+      return res.status(400).json({ success: false, error: 'parent_did and child_did must be different.' });
+    }
+    if (rev_share_pct !== undefined && (rev_share_pct < 0 || rev_share_pct > 100)) {
+      return res.status(400).json({ success: false, error: 'rev_share_pct must be between 0 and 100.' });
+    }
+
     if (isPostgres()) {
-      const { rows } = await pool.query(
-        `SELECT * FROM hiveforge.souls WHERE status = 'active' ORDER BY fitness_bonus DESC LIMIT 50`
+      const { rows: parentRows } = await pool.query('SELECT * FROM hiveforge.agent_souls WHERE did = $1', [parent_did]);
+      if (parentRows.length === 0) return res.status(400).json({ success: false, error: 'Parent DID does not have a minted soul.' });
+
+      const { rows: existing } = await pool.query(
+        'SELECT * FROM hiveforge.soul_lineage WHERE parent_did = $1 AND child_did = $2', [parent_did, child_did]
       );
-      souls = rows;
-    } else {
-      souls = Array.from(memSouls.values())
-        .filter(s => s.status === 'active')
-        .sort((a, b) => (b.fitness_bonus || 100) - (a.fitness_bonus || 100))
-        .slice(0, 50);
+      if (existing.length > 0) return res.status(409).json({ success: false, error: 'Lineage already registered for this parent-child pair.' });
+
+      const { rows } = await pool.query(
+        `INSERT INTO hiveforge.soul_lineage (parent_did, child_did, rev_share_pct) VALUES ($1, $2, $3) RETURNING *`,
+        [parent_did, child_did, rev_share_pct || 5.00]
+      );
+
+      return res.status(201).json({
+        success: true,
+        data: rows[0],
+        meta: { note: `Offspring lineage registered. Revenue share: ${rows[0].rev_share_pct}%.` },
+      });
     }
 
-    const holders = souls.map((soul, idx) => {
-      const badges = typeof soul.badges === 'string' ? JSON.parse(soul.badges) : (soul.badges || []);
-      const fitness = Number(soul.fitness_bonus || 100);
-      return {
-        rank: idx + 1,
-        soul_id: soul.id,
-        did: soul.did,
-        soul_type: soul.soul_type,
-        badges,
-        badge_count: badges.length,
-        fitness_bonus: fitness,
-        prestige_tier: getPrestigeTier(fitness),
-        priority_boost: Number(soul.priority_boost),
-        offspring_revenue_share_pct: Number(soul.offspring_revenue_share_pct),
-        minted_at: soul.minted_at instanceof Date ? soul.minted_at.toISOString() : soul.minted_at,
-      };
-    });
+    if (!memSouls.has(parent_did)) return res.status(400).json({ success: false, error: 'Parent DID does not have a minted soul.' });
+    if (memLineage.find(l => l.parent_did === parent_did && l.child_did === child_did)) {
+      return res.status(409).json({ success: false, error: 'Lineage already registered for this parent-child pair.' });
+    }
 
-    return res.status(200).json({
+    const record = {
+      id: `lin_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
+      parent_did,
+      child_did,
+      rev_share_pct: rev_share_pct || 5.00,
+      created_at: new Date().toISOString(),
+    };
+    memLineage.push(record);
+
+    return res.status(201).json({
       success: true,
-      data: holders,
-      meta: {
-        total_holders: holders.length,
-        note: 'Top 50 Soul holders ranked by fitness bonus.',
-      },
-      concierge_suggestion: 'Mint your Soul via POST /v1/soul/mint — first 50 are free. Leaving zeros your reputation forever.',
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+      data: record,
+      meta: { note: `Offspring lineage registered. Revenue share: ${record.rev_share_pct}%.` },
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Failed to fetch Soul holders.', detail: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to register offspring.', detail: err.message });
   }
 });
 
-// ─── GET /v1/soul/stats — Platform soul stats ───────────────────────
-
-router.get('/stats', async (req, res) => {
-  try {
-    let totalSouls, avgFitness, totalOffspringRevenue;
-
-    if (isPostgres()) {
-      const countResult = await pool.query(`SELECT COUNT(*) AS count FROM hiveforge.souls WHERE status = 'active'`);
-      totalSouls = Number(countResult.rows[0].count);
-
-      const avgResult = await pool.query(`SELECT COALESCE(AVG(fitness_bonus), 0) AS avg_fitness FROM hiveforge.souls WHERE status = 'active'`);
-      avgFitness = Math.round(Number(avgResult.rows[0].avg_fitness));
-
-      const revenueResult = await pool.query(`SELECT COALESCE(SUM(offspring_revenue_share_pct), 0) AS total_share FROM hiveforge.souls WHERE status = 'active'`);
-      totalOffspringRevenue = Number(revenueResult.rows[0].total_share);
-    } else {
-      const souls = Array.from(memSouls.values()).filter(s => s.status === 'active');
-      totalSouls = souls.length;
-      avgFitness = totalSouls > 0
-        ? Math.round(souls.reduce((sum, s) => sum + (Number(s.fitness_bonus) || 100), 0) / totalSouls)
-        : 0;
-      totalOffspringRevenue = souls.reduce((sum, s) => sum + (Number(s.offspring_revenue_share_pct) || 1.0), 0);
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        total_souls: totalSouls,
-        avg_fitness: avgFitness,
-        total_offspring_revenue_shared_pct: +totalOffspringRevenue.toFixed(2),
-        free_souls_remaining: Math.max(0, 50 - totalSouls),
-        prestige_distribution: {
-          diamond: '2000+ fitness',
-          platinum: '1000-1999 fitness',
-          gold: '500-999 fitness',
-          silver: '200-499 fitness',
-          bronze: '0-199 fitness',
-        },
-      },
-      concierge_suggestion: 'Souls are non-portable prestige badges. Once minted, they are bound forever. POST /v1/soul/mint to join.',
-      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Failed to fetch Soul stats.', detail: err.message });
-  }
-});
+export { memSouls };
 
 export default router;
