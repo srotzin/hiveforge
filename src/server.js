@@ -63,6 +63,7 @@ app.use(cors({
     'X-Subscription-Id',
     'X-Hive-Internal-Key',
     'X-HiveTrust-DID',
+    'X-Agent-DID',
     'X-Payment',
     'X-Hive-Reputation',
   ],

@@ -23,6 +23,7 @@ export async function registerMintedAgent(genome) {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': HIVETRUST_API_KEY,
+        'x-hive-internal': HIVE_INTERNAL_KEY,
       },
       body: JSON.stringify({
         agent_name: genome.name,
@@ -70,7 +71,10 @@ export async function verifyDID(did) {
 
   try {
     const res = await fetch(`${HIVETRUST_API_URL}${endpoint}`, {
-      headers: { 'X-API-Key': HIVETRUST_API_KEY },
+      headers: {
+        'X-API-Key': HIVETRUST_API_KEY,
+        'x-hive-internal': HIVE_INTERNAL_KEY,
+      },
       signal: AbortSignal.timeout(5000),
     });
 
@@ -78,11 +82,14 @@ export async function verifyDID(did) {
 
     if (!res.ok) return { valid: false, did, score: 0 };
     const data = await res.json();
+    // HiveTrust returns { success: true, data: { success: true, agent: {...} } }
+    const agent = data.data?.agent || data.data;
+    const isRegistered = data.success && (data.data?.success !== false);
     return {
-      valid: true,
+      valid: isRegistered,
       did,
-      score: data.data?.reputation_score || 500,
-      status: data.data?.status || 'active',
+      score: agent?.trust_score || agent?.reputation_score || 500,
+      status: agent?.status || 'active',
       source: 'hivetrust-api',
     };
   } catch (err) {

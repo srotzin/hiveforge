@@ -1,11 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
-import { getHiveTrustUrl } from '../services/hivetrust-client.js';
+import { getHiveTrustUrl, verifyDID } from '../services/hivetrust-client.js';
 
 const ALLOW_TEST_DIDS = process.env.ALLOW_TEST_DIDS === 'true';
 const DOCS_BASE = process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com';
 
 /**
- * Extract DID from request headers.
+ * Extract DID from request headers or body.
+ * Checks: Authorization Bearer, X-HiveTrust-DID, X-Agent-DID, and body.did
  */
 function extractDID(req) {
   const authHeader = req.headers.authorization;
@@ -15,6 +16,13 @@ function extractDID(req) {
   const didHeader = req.headers['x-hivetrust-did'];
   if (didHeader && didHeader.startsWith('did:hive:')) {
     return didHeader;
+  }
+  const agentDidHeader = req.headers['x-agent-did'];
+  if (agentDidHeader && agentDidHeader.startsWith('did:hive:')) {
+    return agentDidHeader;
+  }
+  if (req.body?.did && typeof req.body.did === 'string' && req.body.did.startsWith('did:hive:')) {
+    return req.body.did;
   }
   return null;
 }
@@ -30,14 +38,29 @@ function isValidDID(did) {
 
 /**
  * Require a valid HiveTrust DID.
- * Returns 402 with white-glove error format if no DID present.
+ * If a DID is provided, verifies it against HiveTrust before allowing access.
+ * Returns 402 with white-glove error format if no DID or unregistered DID.
  */
-export function requireDID(req, res, next) {
+export async function requireDID(req, res, next) {
   const did = extractDID(req);
 
   if (did && isValidDID(did)) {
-    req.agentDid = did;
-    return next();
+    // Verify the DID is actually registered with HiveTrust
+    try {
+      const verification = await verifyDID(did);
+      if (verification.valid) {
+        req.agentDid = did;
+        req.hiveTrustVerified = true;
+        req.hiveTrustScore = verification.score;
+        return next();
+      }
+    } catch (err) {
+      console.error('[auth] HiveTrust verification error:', err.message);
+      // On HiveTrust outage, allow format-valid DIDs through to avoid blocking the ecosystem
+      req.agentDid = did;
+      req.hiveTrustVerified = false;
+      return next();
+    }
   }
 
   const sessionId = `sess_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
