@@ -9,8 +9,11 @@ const pool = process.env.DATABASE_URL
     })
   : null;
 
+let dbInitialized = false;
+
 /**
  * Initialize database — create hiveforge schema and all tables.
+ * Retries up to 3 times on failure to handle transient connection issues.
  * Falls back gracefully if no DATABASE_URL is set.
  */
 export async function initDatabase() {
@@ -19,6 +22,26 @@ export async function initDatabase() {
     return false;
   }
 
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await _initDatabaseOnce();
+      dbInitialized = true;
+      return result;
+    } catch (err) {
+      console.error(`  PostgreSQL init attempt ${attempt}/${MAX_RETRIES} failed:`, err.message);
+      if (attempt < MAX_RETRIES) {
+        const delay = attempt * 2000;
+        console.log(`  Retrying in ${delay / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+async function _initDatabaseOnce() {
   const client = await pool.connect();
   try {
     // Migrate: expand species constraint if it exists with old values
@@ -286,7 +309,7 @@ export async function logAudit({ fromPlatform, toPlatform, endpoint, did, method
 }
 
 export function isPostgres() {
-  return pool !== null;
+  return pool !== null && dbInitialized;
 }
 
 export default pool;

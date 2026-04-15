@@ -16,7 +16,7 @@ const memClaims = [];
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function requireInternalHeader(req, res, next) {
-  const key = req.headers['x-hive-internal'];
+  const key = req.headers['x-hive-internal'] || req.headers['x-hive-internal-key'];
   if (key !== HIVE_INTERNAL_KEY) {
     return res.status(403).json({ success: false, error: 'Forbidden — invalid or missing x-hive-internal header.' });
   }
