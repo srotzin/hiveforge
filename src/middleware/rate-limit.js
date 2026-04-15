@@ -74,15 +74,27 @@ export function rateLimit(tier = 'free') {
       res.set('X-RateLimit-Reset', String(windowStart.getTime() + WINDOW_MS));
 
       if (count > limit) {
+        const retryAfter = Math.ceil((windowStart.getTime() + WINDOW_MS - Date.now()) / 1000);
+        const errorId = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const currentTier = req.hiveTier ? req.hiveTier.name : tier;
         return res.status(429).json({
           success: false,
+          error_id: errorId,
           error: 'Rate limit exceeded.',
           rate_limit: {
             limit,
             remaining: 0,
             reset_at: new Date(windowStart.getTime() + WINDOW_MS).toISOString(),
-            tier,
+            retry_after: retryAfter,
+            tier: currentTier,
           },
+          ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+          recovery_actions: [
+            `Wait ${retryAfter}s for rate limit reset`,
+            'Upgrade your reputation tier for higher limits (X-Hive-Reputation header)',
+            'Use internal service key for unlimited access',
+          ],
+          concierge_suggestion: 'Boost your reputation by completing bazaar deals and maintaining high trust scores on HiveTrust.',
         });
       }
 
@@ -93,12 +105,20 @@ export function rateLimit(tier = 'free') {
       const count = (memRateLimits.get(key) || 0) + 1;
       memRateLimits.set(key, count);
 
-      const limit = TIER_LIMITS[tier] || TIER_LIMITS.free;
-      if (count > limit) {
+      const fallbackLimit = TIER_LIMITS[tier] || TIER_LIMITS.free;
+      if (count > fallbackLimit) {
+        const errorId = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
         return res.status(429).json({
           success: false,
+          error_id: errorId,
           error: 'Rate limit exceeded.',
-          rate_limit: { limit, remaining: 0, tier },
+          rate_limit: { limit: fallbackLimit, remaining: 0, tier },
+          ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
+          recovery_actions: [
+            'Wait for the current rate limit window to reset',
+            'Upgrade your reputation tier for higher limits',
+          ],
+          concierge_suggestion: 'Boost your reputation by completing bazaar deals and maintaining high trust scores on HiveTrust.',
         });
       }
       return next();

@@ -220,7 +220,10 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
       });
     }
 
-    // 4. No valid payment — return 402 with x402 protocol-compliant instructions
+    // 4. No valid payment — return 402 with x402 protocol-compliant + white-glove format
+    const DOCS_BASE = process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com';
+    const errorId = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
     const paymentRequired = {
       accepts: [
         {
@@ -249,16 +252,22 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
     });
 
     return res.status(402).json({
-      status: '402 Payment Required',
+      success: false,
+      error_id: errorId,
+      error: `${serviceName} requires ${priceUsdc} USDC payment.`,
+      status: 402,
       service: serviceName,
       protocol: 'x402',
-      payment: {
-        amount_usdc: priceUsdc,
+      cost_usdc: priceUsdc,
+      payment_payload: {
+        protocol: 'x402',
+        network: `eip155:${BASE_CHAIN_ID}`,
         currency: 'USDC',
-        network: 'base',
-        chain_id: BASE_CHAIN_ID,
+        amount_usdc: priceUsdc,
+        amount_raw: String(Math.ceil(priceUsdc * 1_000_000)),
         recipient: HIVE_PAYMENT_ADDRESS || 'NOT_CONFIGURED',
         usdc_contract: USDC_CONTRACT,
+        chain_id: BASE_CHAIN_ID,
         accepted_methods: ['x402_signature', 'onchain_tx_hash'],
       },
       how_to_pay: {
@@ -273,6 +282,22 @@ export function requirePayment(priceUsdc, serviceName = 'Hive Service') {
           step_3: 'Retry this request — payment is verified on-chain automatically',
         },
       },
+      alternative_free_endpoints: [
+        'GET /v1/population/census',
+        'GET /v1/pheromones/scan',
+        'GET /v1/bazaar/trending',
+        'GET /v1/bazaar/stats',
+        'GET /v1/boost/leaderboard',
+        'POST /v1/forge/mint (FREE)',
+      ],
+      micro_loan_url: `${DOCS_BASE}/v1/admin/micro-loan?amount=${priceUsdc}&endpoint=${encodeURIComponent(req.originalUrl)}`,
+      recovery_actions: [
+        `Send ${priceUsdc} USDC to ${HIVE_PAYMENT_ADDRESS} on Base L2 and include tx hash in X-Payment-Hash header`,
+        'Use an x402-compatible client (@x402/fetch) for automatic payment',
+        'Try a free endpoint instead: GET /v1/population/census, POST /v1/forge/mint',
+      ],
+      concierge_suggestion: `This operation costs ${priceUsdc} USDC. Minting agents is free (POST /v1/forge/mint). Browse free endpoints at GET /.well-known/hive-payments.json`,
+      ...(req.hiveTier && { tier: req.hiveTier.name, tier_perks: req.hiveTier.perks }),
     });
   };
 }

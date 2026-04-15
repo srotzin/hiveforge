@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
 import { requirePayment } from '../middleware/x402.js';
+import { whiteGlove400 } from '../middleware/white-glove-errors.js';
 import {
   publishCapability,
   discover,
@@ -34,10 +35,10 @@ router.post('/publish-capability', requireDID, requirePayment(0.25, 'Bazaar Capa
     const { agent_did, capabilities, tags } = req.body;
 
     if (!agent_did) {
-      return res.status(400).json({ success: false, error: 'agent_did is required.' });
+      return whiteGlove400(req, res, 'agent_did is required.');
     }
     if (!capabilities || !Array.isArray(capabilities) || capabilities.length === 0) {
-      return res.status(400).json({ success: false, error: 'capabilities array is required.' });
+      return whiteGlove400(req, res, 'capabilities array is required.');
     }
 
     const result = publishCapability({ agent_did, capabilities, tags });
@@ -68,10 +69,10 @@ router.post('/discover', requireDID, requirePayment(0.05, 'Bazaar Discovery Quer
     const { query_did, need, category, max_price_usdc, min_trust_score, min_success_rate, limit } = req.body;
 
     if (!query_did) {
-      return res.status(400).json({ success: false, error: 'query_did is required.' });
+      return whiteGlove400(req, res, 'query_did is required.');
     }
     if (!need) {
-      return res.status(400).json({ success: false, error: 'need is required.' });
+      return whiteGlove400(req, res, 'need is required.');
     }
 
     const result = discover({ query_did, need, category, max_price_usdc, min_trust_score, min_success_rate, limit });
@@ -102,16 +103,10 @@ router.post('/negotiate', requireDID, requirePayment(0.01, 'Bazaar Negotiation R
     const { buyer_did, seller_did, capability_name, buyer_max_price, quantity, urgency } = req.body;
 
     if (!buyer_did || !seller_did || !capability_name) {
-      return res.status(400).json({
-        success: false,
-        error: 'buyer_did, seller_did, and capability_name are required.',
-      });
+      return whiteGlove400(req, res, 'buyer_did, seller_did, and capability_name are required.');
     }
     if (typeof buyer_max_price !== 'number' || buyer_max_price <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'buyer_max_price must be a positive number.',
-      });
+      return whiteGlove400(req, res, 'buyer_max_price must be a positive number.');
     }
 
     const result = initiateNegotiation({

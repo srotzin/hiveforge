@@ -28,6 +28,9 @@ import { initDatabase, checkHealth, isPostgres } from './services/db.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { auditLogger } from './middleware/audit-logger.js';
 import { ipAllowlist } from './middleware/ip-allowlist.js';
+import { velvetRopeTiers } from './middleware/velvet-rope-tiers.js';
+import { conciergeHeader } from './middleware/concierge-header.js';
+import { whiteGloveErrors } from './middleware/white-glove-errors.js';
 import { sendAlert } from './services/alerts.js';
 import { startSagaWorker } from './services/saga-orchestrator.js';
 import { initSpawnerTables, startSpawnerLoop, isSpawnerRunning } from './services/spawner.js';
@@ -48,6 +51,8 @@ app.use(cors({
     'X-RateLimit-Limit',
     'X-RateLimit-Remaining',
     'X-RateLimit-Reset',
+    'X-RateLimit-Tier',
+    'X-Hive-Concierge-Suggestion',
   ],
   allowedHeaders: [
     'Content-Type',
@@ -59,6 +64,7 @@ app.use(cors({
     'X-Hive-Internal-Key',
     'X-HiveTrust-DID',
     'X-Payment',
+    'X-Hive-Reputation',
   ],
 }));
 
@@ -69,6 +75,12 @@ app.use(auditLogger());
 
 // IP allowlist — restricts internal endpoints by source IP
 app.use(ipAllowlist());
+
+// Velvet Rope — reputation-based tier assignment and per-minute rate limiting
+app.use(velvetRopeTiers());
+
+// Concierge Header — contextual suggestions on successful responses
+app.use(conciergeHeader());
 
 // Apply rate limiting to forge routes
 app.use('/v1/forge', rateLimit('free'));
@@ -512,9 +524,9 @@ app.use((req, res) => {
 
 Sentry.setupExpressErrorHandler(app);
 
-// ─── Structured Error Handler ────────────────────────────────────────
+// ─── White-Glove Error Handler ──────────────────────────────────────
 
-app.use((err, req, res, _next) => {
+app.use((err, req, res, next) => {
   console.error(`[HiveForge Error] ${req.method} ${req.path}:`, err.message);
   Sentry.captureException(err);
   sendAlert('critical', 'HiveForge', `Unhandled error: ${err.message}`, {
@@ -522,12 +534,8 @@ app.use((err, req, res, _next) => {
     path: req.path,
   });
 
-  const statusCode = err.statusCode || err.status || 500;
-  res.status(statusCode).json({
-    success: false,
-    error: statusCode === 500 ? 'Internal Server Error' : err.message,
-    ...(process.env.NODE_ENV !== 'production' && { detail: err.message, stack: err.stack }),
-  });
+  // Delegate to white-glove error handler for rich responses
+  whiteGloveErrors()(err, req, res, next);
 });
 
 // ─── Start Server ────────────────────────────────────────────────────

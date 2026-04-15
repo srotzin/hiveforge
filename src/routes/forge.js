@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
 import { requirePayment } from '../middleware/x402.js';
+import { whiteGlove400 } from '../middleware/white-glove-errors.js';
 import { mintAgent, getGenome, retireAgent, getAllGenomes, getActiveGenomes, recordEvolutionCycle, buyoutRoyalty, getBuyoutPrice } from '../services/agent-foundry.js';
 import { crossbreed, evolve } from '../services/genetic-engine.js';
 import { calculateFitness } from '../services/fitness-evaluator.js';
@@ -94,10 +95,7 @@ router.post('/crossbreed', requireDID, requirePayment(0.25, 'Agent Crossbreeding
     const { parent_a, parent_b, mutation_rate = 0.1 } = req.body;
 
     if (!parent_a || !parent_b) {
-      return res.status(400).json({
-        success: false,
-        error: 'Both parent_a and parent_b genome IDs are required.',
-      });
+      return whiteGlove400(req, res, 'Both parent_a and parent_b genome IDs are required.');
     }
 
     const genomeA = await getGenome(parent_a);

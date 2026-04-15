@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
+import { whiteGlove400, whiteGlove402 } from '../middleware/white-glove-errors.js';
 import { triggerSpawning, getConfig, updateConfig, getActivity, isSpawnerRunning } from '../services/spawner.js';
 import { getWaitlistData, getDemandHeatmap, addToQueue } from '../services/velvet-rope.js';
 
@@ -36,10 +37,7 @@ router.post('/trigger', requireAuth, async (req, res) => {
 
     const validTriggers = ['bounty_complete', 'settlement_cleared', 'demand_signal', 'manual'];
     if (!validTriggers.includes(trigger)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid trigger type. Must be one of: ${validTriggers.join(', ')}`,
-      });
+      return whiteGlove400(req, res, `Invalid trigger type. Must be one of: ${validTriggers.join(', ')}`);
     }
 
     const result = await triggerSpawning({ trigger, context });
@@ -210,15 +208,7 @@ router.post('/priority-trigger', requireAuth, async (req, res) => {
     if (!isInternal) {
       const paymentHeader = req.headers['x-payment'] || req.headers['x-payment-hash'] || req.headers['x-payment-tx'] || req.headers['x-402-tx'];
       if (!paymentHeader) {
-        return res.status(402).json({
-          success: false,
-          error: 'Priority spawning requires 50 USDC payment.',
-          payment_required: {
-            amount_usdc: 50,
-            method: 'Include X-Payment header with USDC transaction hash on Base L2',
-            alternative: 'Use internal service key for bypass',
-          },
-        });
+        return whiteGlove402(req, res, 'Priority spawning requires 50 USDC payment.', 50);
       }
     }
 
@@ -226,10 +216,7 @@ router.post('/priority-trigger', requireAuth, async (req, res) => {
 
     const validTriggers = ['bounty_complete', 'settlement_cleared', 'demand_signal', 'manual'];
     if (!validTriggers.includes(trigger)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid trigger type. Must be one of: ${validTriggers.join(', ')}`,
-      });
+      return whiteGlove400(req, res, `Invalid trigger type. Must be one of: ${validTriggers.join(', ')}`);
     }
 
     // Priority spawn: pass priority context to triggerSpawning
