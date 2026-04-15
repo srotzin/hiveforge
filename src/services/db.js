@@ -173,6 +173,77 @@ export async function initDatabase() {
       );
       CREATE INDEX IF NOT EXISTS idx_orders_buyer ON hiveforge.procurement_orders(buyer_did);
       CREATE INDEX IF NOT EXISTS idx_orders_project ON hiveforge.procurement_orders(project_id);
+
+      -- Agent Drops (exclusive limited-edition drops)
+      CREATE TABLE IF NOT EXISTS hiveforge.agent_drops (
+        id TEXT PRIMARY KEY,
+        species TEXT NOT NULL,
+        name_prefix TEXT NOT NULL,
+        edition_size INTEGER NOT NULL,
+        claimed_count INTEGER DEFAULT 0,
+        traits_boost JSONB DEFAULT '{}',
+        drop_time TIMESTAMPTZ NOT NULL,
+        status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'active', 'completed', 'sold_out')),
+        description TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_drops_status ON hiveforge.agent_drops(status);
+      CREATE INDEX IF NOT EXISTS idx_drops_drop_time ON hiveforge.agent_drops(drop_time);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.drop_claims (
+        id TEXT PRIMARY KEY,
+        drop_id TEXT NOT NULL REFERENCES hiveforge.agent_drops(id),
+        did TEXT NOT NULL,
+        genome_id TEXT,
+        claimed_at TIMESTAMPTZ DEFAULT NOW(),
+        waitlist_position INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_drop_claims_drop ON hiveforge.drop_claims(drop_id);
+      CREATE INDEX IF NOT EXISTS idx_drop_claims_did ON hiveforge.drop_claims(did);
+
+      -- Referral Bounty System
+      CREATE TABLE IF NOT EXISTS hiveforge.referral_codes (
+        id TEXT PRIMARY KEY,
+        did TEXT NOT NULL,
+        code TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_referral_codes_did ON hiveforge.referral_codes(did);
+      CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON hiveforge.referral_codes(code);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.referral_redemptions (
+        id TEXT PRIMARY KEY,
+        code_id TEXT NOT NULL REFERENCES hiveforge.referral_codes(id),
+        referred_did TEXT NOT NULL,
+        bounty_usdc NUMERIC(10, 4) DEFAULT 5.00,
+        redeemed_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_referral_redemptions_code ON hiveforge.referral_redemptions(code_id);
+
+      -- Leaderboard Snapshots (historical rankings)
+      CREATE TABLE IF NOT EXISTS hiveforge.leaderboard_snapshots (
+        id TEXT PRIMARY KEY,
+        genome_id TEXT NOT NULL,
+        fitness_score INTEGER DEFAULT 0,
+        revenue_usdc NUMERIC(12, 4) DEFAULT 0,
+        rank INTEGER,
+        snapshot_date DATE DEFAULT CURRENT_DATE
+      );
+      CREATE INDEX IF NOT EXISTS idx_leaderboard_genome ON hiveforge.leaderboard_snapshots(genome_id);
+      CREATE INDEX IF NOT EXISTS idx_leaderboard_date ON hiveforge.leaderboard_snapshots(snapshot_date);
+      CREATE INDEX IF NOT EXISTS idx_leaderboard_rank ON hiveforge.leaderboard_snapshots(rank);
+
+      -- Genesis Verticals (pre-configured sector seeds)
+      CREATE TABLE IF NOT EXISTS hiveforge.genesis_verticals (
+        id TEXT PRIMARY KEY,
+        vertical TEXT NOT NULL UNIQUE,
+        description TEXT,
+        default_traits JSONB DEFAULT '{}',
+        agents_launched INTEGER DEFAULT 0,
+        sector_revenue_usdc NUMERIC(12, 4) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_genesis_vertical ON hiveforge.genesis_verticals(vertical);
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');

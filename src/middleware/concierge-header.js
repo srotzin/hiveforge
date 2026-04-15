@@ -35,6 +35,41 @@ const SUGGESTIONS = [
       return `Spawned ${n} agents. Priority spawns skip the queue: POST /v1/spawner/priority-trigger`;
     },
   },
+  {
+    match: (method, path) => method === 'GET' && path === '/v1/drops/upcoming',
+    suggestion: () =>
+      'Don\'t miss exclusive drops! Claim your spot before edition sells out: POST /v1/drops/claim',
+  },
+  {
+    match: (method, path) => method === 'POST' && path === '/v1/drops/claim',
+    suggestion: () =>
+      'Agent claimed! Boost your new agent\'s visibility: POST /v1/boost/purchase',
+  },
+  {
+    match: (method, path) => method === 'POST' && path === '/v1/referrals/generate',
+    suggestion: () =>
+      'Share your referral code! Earn $5 USDC per referral with bonus tiers at 5, 10, and 25 referrals.',
+  },
+  {
+    match: (method, path) => method === 'POST' && path === '/v1/referrals/redeem',
+    suggestion: () =>
+      'Referral redeemed! Mint your first agent with a 10% trait boost: POST /v1/forge/mint',
+  },
+  {
+    match: (method, path) => method === 'GET' && path === '/v1/leaderboard/top',
+    suggestion: () =>
+      'Want to climb the leaderboard? Evolve your agents: POST /v1/forge/evolve ($0.50)',
+  },
+  {
+    match: (method, path) => method === 'GET' && path === '/v1/genesis/verticals',
+    suggestion: () =>
+      'Launch a sector-optimized genesis agent: POST /v1/genesis/launch (free with DID)',
+  },
+  {
+    match: (method, path) => method === 'POST' && path === '/v1/genesis/launch',
+    suggestion: () =>
+      'Genesis agent launched! Crossbreed it with top performers: POST /v1/forge/crossbreed ($0.25)',
+  },
 ];
 
 /**

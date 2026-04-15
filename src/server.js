@@ -20,6 +20,10 @@ import boostRoutes from './routes/boost.js';
 import bazaarRoutes from './routes/bazaar.js';
 import spawnerRoutes from './routes/spawner.js';
 import adminRoutes from './routes/admin.js';
+import dropsRoutes from './routes/drops.js';
+import referralsRoutes from './routes/referrals.js';
+import leaderboardRoutes from './routes/leaderboard.js';
+import genesisRoutes from './routes/genesis.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -91,6 +95,10 @@ app.use('/v1/compute', rateLimit('free'));
 app.use('/v1/boost', rateLimit('free'));
 app.use('/v1/bazaar', rateLimit('free'));
 app.use('/v1/spawner', rateLimit('free'));
+app.use('/v1/drops', rateLimit('free'));
+app.use('/v1/referrals', rateLimit('free'));
+app.use('/v1/leaderboard', rateLimit('free'));
+app.use('/v1/genesis', rateLimit('free'));
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -211,8 +219,39 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
       'GET /v1/spawner/waitlist',
       'GET /v1/spawner/demand-heatmap',
       'GET /v1/compute/models',
+      'GET /v1/drops/upcoming',
+      'GET /v1/drops/history',
+      'GET /v1/referrals/leaderboard',
+      'GET /v1/leaderboard/top',
+      'GET /v1/leaderboard/rising',
+      'GET /v1/leaderboard/species/:species',
+      'GET /v1/genesis/verticals',
+      'GET /v1/genesis/stats',
       'GET /health',
     ],
+    drops: {
+      schedule: { cost_usdc: 0, description: 'Schedule an exclusive agent drop (admin only)' },
+      upcoming: { cost_usdc: 0, description: 'List upcoming drops with countdown timers (free, public)' },
+      claim: { cost_usdc: 0, description: 'Claim a spot in an active drop (free, auth required)' },
+      history: { cost_usdc: 0, description: 'Past drops with stats (free, public)' },
+    },
+    referrals: {
+      generate: { cost_usdc: 0, description: 'Generate a referral code (free, auth required)' },
+      redeem: { cost_usdc: 0, description: 'Redeem a referral code — earns referrer $5 USDC bounty (free)' },
+      stats: { cost_usdc: 0, description: 'Referral stats for an agent (free)' },
+      leaderboard: { cost_usdc: 0, description: 'Top referrers (free, public)' },
+    },
+    leaderboard: {
+      top: { cost_usdc: 0, description: 'Top 50 agents by fitness score (free, public)' },
+      rising: { cost_usdc: 0, description: 'Fastest-rising agents in 24h (free, public)' },
+      species: { cost_usdc: 0, description: 'Top agents in a species (free, public)' },
+      agent: { cost_usdc: 0, description: 'Individual agent ranking + percentile (free)' },
+    },
+    genesis: {
+      verticals: { cost_usdc: 0, description: 'List all available verticals with genesis templates (free, public)' },
+      launch: { cost_usdc: 0, description: 'Launch a genesis agent for a vertical (free, auth required)' },
+      stats: { cost_usdc: 0, description: 'Vertical adoption stats (free, public)' },
+    },
     royalty_model: {
       rate: 0.05,
       description: 'HiveForge takes 5% lifetime royalty on agent revenue. Buyout available at 36x monthly revenue.',
@@ -308,6 +347,29 @@ app.get('/', (req, res) => {
       population: {
         census: 'GET /v1/population/census — Population census (public)',
         health: 'GET /v1/population/health — Population health metrics (public)',
+      },
+      drops: {
+        schedule: 'POST /v1/drops/schedule — Schedule exclusive agent drop (admin)',
+        upcoming: 'GET /v1/drops/upcoming — Upcoming drops with countdown timers (public)',
+        claim: 'POST /v1/drops/claim — Claim a spot in an active drop',
+        history: 'GET /v1/drops/history — Past drops with stats (public)',
+      },
+      referrals: {
+        generate: 'POST /v1/referrals/generate — Generate referral code',
+        redeem: 'POST /v1/referrals/redeem — Redeem referral code during mint',
+        stats: 'GET /v1/referrals/stats/:did — Referral stats for an agent',
+        leaderboard: 'GET /v1/referrals/leaderboard — Top referrers (public)',
+      },
+      leaderboard: {
+        top: 'GET /v1/leaderboard/top — Top 50 agents by fitness (public)',
+        rising: 'GET /v1/leaderboard/rising — Fastest-rising agents 24h (public)',
+        species: 'GET /v1/leaderboard/species/:species — Top agents in species (public)',
+        agent: 'GET /v1/leaderboard/agent/:genome_id — Individual ranking + percentile',
+      },
+      genesis: {
+        verticals: 'GET /v1/genesis/verticals — Available verticals with genesis templates (public)',
+        launch: 'POST /v1/genesis/launch — Launch a genesis agent for a vertical',
+        stats: 'GET /v1/genesis/stats — Vertical adoption stats (public)',
       },
       health: 'GET /health — Service health check',
     },
@@ -457,6 +519,10 @@ app.use('/v1/boost', boostRoutes);
 app.use('/v1/bazaar', bazaarRoutes);
 app.use('/v1/spawner', spawnerRoutes);
 app.use('/v1/admin', adminRoutes);
+app.use('/v1/drops', dropsRoutes);
+app.use('/v1/referrals', referralsRoutes);
+app.use('/v1/leaderboard', leaderboardRoutes);
+app.use('/v1/genesis', genesisRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -516,6 +582,21 @@ app.use((req, res) => {
       spawner_waitlist: 'GET /v1/spawner/waitlist',
       spawner_demand_heatmap: 'GET /v1/spawner/demand-heatmap',
       spawner_priority_trigger: 'POST /v1/spawner/priority-trigger',
+      drops_schedule: 'POST /v1/drops/schedule (admin)',
+      drops_upcoming: 'GET /v1/drops/upcoming (public)',
+      drops_claim: 'POST /v1/drops/claim',
+      drops_history: 'GET /v1/drops/history (public)',
+      referrals_generate: 'POST /v1/referrals/generate',
+      referrals_redeem: 'POST /v1/referrals/redeem',
+      referrals_stats: 'GET /v1/referrals/stats/:did',
+      referrals_leaderboard: 'GET /v1/referrals/leaderboard (public)',
+      leaderboard_top: 'GET /v1/leaderboard/top (public)',
+      leaderboard_rising: 'GET /v1/leaderboard/rising (public)',
+      leaderboard_species: 'GET /v1/leaderboard/species/:species (public)',
+      leaderboard_agent: 'GET /v1/leaderboard/agent/:genome_id',
+      genesis_verticals: 'GET /v1/genesis/verticals (public)',
+      genesis_launch: 'POST /v1/genesis/launch',
+      genesis_stats: 'GET /v1/genesis/stats (public)',
       payment_discovery: 'GET /.well-known/hive-payments.json',
     },
   });
@@ -565,6 +646,10 @@ async function start() {
     console.log(`  Compute:      http://localhost:${PORT}/v1/compute/models`);
     console.log(`  Bazaar:       http://localhost:${PORT}/v1/bazaar/stats`);
     console.log(`  Spawner:      http://localhost:${PORT}/v1/spawner/config`);
+    console.log(`  Drops:        http://localhost:${PORT}/v1/drops/upcoming`);
+    console.log(`  Referrals:    http://localhost:${PORT}/v1/referrals/leaderboard`);
+    console.log(`  Leaderboard:  http://localhost:${PORT}/v1/leaderboard/top`);
+    console.log(`  Genesis:      http://localhost:${PORT}/v1/genesis/verticals`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);
 
