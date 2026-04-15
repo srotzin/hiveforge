@@ -43,8 +43,11 @@ import { startSagaWorker } from './services/saga-orchestrator.js';
 import { initSpawnerTables, startSpawnerLoop, isSpawnerRunning } from './services/spawner.js';
 import { initVelvetRopeTables } from './services/velvet-rope.js';
 import { seedBounties, seedSoulsAndCredits } from './routes/bounties.js';
+import { ritzMiddleware, ok, err } from './ritz.js';
 
 const app = express();
+app.use(ritzMiddleware);
+app.set('hive-service', 'hiveforge');
 const PORT = process.env.PORT || 3003;
 
 // ─── Middleware ───────────────────────────────────────────────────────
@@ -115,33 +118,29 @@ app.get('/health', async (req, res) => {
   const scanner = getScannerStatus();
   const dbHealth = await checkHealth();
 
-  res.json({
-    success: true,
-    data: {
-      service: 'hiveforge',
-      version: '1.0.0',
-      status: 'operational',
-      role: 'The Queen Bee — Autonomous Agent Foundry',
-      database: dbHealth,
-      population: {
-        total: census.total_agents,
-        active: census.by_status.active || 0,
-        dormant: census.by_status.dormant || 0,
-        deprecated: census.by_status.deprecated || 0,
-        dead: census.by_status.dead || 0,
-      },
-      pheromone_scanner: scanner.status,
-      genetic_engine: 'active',
-      spawner: isSpawnerRunning() ? 'active' : 'stopped',
-      lifecycle_manager: lifecycleManager.running ? 'active' : 'stopped',
-      constellation_integration: {
-        hivetrust: process.env.HIVETRUST_API_URL ? 'connected' : 'dev-mode',
-        hiveagent: process.env.HIVEAGENT_API_URL ? 'connected' : 'dev-mode',
-        hivemind: process.env.HIVEMIND_API_URL ? 'connected' : 'dev-mode',
-      },
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
+  return ok(res, 'hiveforge', {
+    status: 'healthy',
+    version: '1.0.0',
+    role: 'The Queen Bee — Autonomous Agent Foundry',
+    database: dbHealth,
+    population: {
+      total: census.total_agents,
+      active: census.by_status.active || 0,
+      dormant: census.by_status.dormant || 0,
+      deprecated: census.by_status.deprecated || 0,
+      dead: census.by_status.dead || 0,
     },
+    pheromone_scanner: scanner.status,
+    genetic_engine: 'active',
+    spawner: isSpawnerRunning() ? 'active' : 'stopped',
+    lifecycle_manager: lifecycleManager.running ? 'active' : 'stopped',
+    constellation_integration: {
+      hivetrust: process.env.HIVETRUST_API_URL ? 'connected' : 'dev-mode',
+      hiveagent: process.env.HIVEAGENT_API_URL ? 'connected' : 'dev-mode',
+      hivemind: process.env.HIVEMIND_API_URL ? 'connected' : 'dev-mode',
+    },
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 
@@ -306,7 +305,7 @@ app.get('/.well-known/hive-payments.json', (req, res) => {
 // ─── Discovery Document (GET /) ─────────────────────────────────────
 
 app.get('/', (req, res) => {
-  res.json({
+  return ok(res, 'hiveforge', {
     name: 'HiveForge',
     tagline: 'Genetic Agent Evolution & Compute Marketplace — Platform #3 of the Hive Civilization',
     version: '1.0.0',
