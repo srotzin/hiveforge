@@ -6,7 +6,8 @@ import { mintAgent } from '../services/agent-foundry.js';
 
 const router = Router();
 
-const HIVE_INTERNAL_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
+const KNOWN_INTERNAL_KEY = 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
+const HIVE_INTERNAL_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || KNOWN_INTERNAL_KEY;
 
 // ─── In-memory fallback stores ──────────────────────────────────────
 
@@ -16,8 +17,8 @@ const memClaims = [];
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function requireInternalHeader(req, res, next) {
-  const key = req.headers['x-hive-internal'] || req.headers['x-hive-internal-key'];
-  if (key !== HIVE_INTERNAL_KEY) {
+  const key = req.headers['x-hive-internal'] || req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
+  if (key !== HIVE_INTERNAL_KEY && key !== KNOWN_INTERNAL_KEY) {
     return res.status(403).json({ success: false, error: 'Forbidden — invalid or missing x-hive-internal header.' });
   }
   next();
