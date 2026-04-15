@@ -9,6 +9,7 @@ import { scanPheromones } from '../services/pheromone-scanner.js';
 import { createSaga, advanceSaga, completeSaga } from '../services/saga-orchestrator.js';
 import { sendAlert } from '../services/alerts.js';
 import { isPostgres } from '../services/db.js';
+import { grantMintCredits } from './credits.js';
 
 const router = Router();
 
@@ -60,6 +61,14 @@ router.post('/mint', requireDID, async (req, res) => {
       }
     }
 
+    // Grant 3 USDC in Ritz Credits to the creator
+    let ritzCredits = null;
+    try {
+      ritzCredits = await grantMintCredits(req.agentDid);
+    } catch (creditErr) {
+      console.error('[Ritz Credits] Failed to grant mint credits:', creditErr.message);
+    }
+
     sendAlert('info', 'HiveForge', `Agent minted: ${result.genome.genome_id}`, {
       species: result.genome.species,
       creator: req.agentDid,
@@ -73,6 +82,11 @@ router.post('/mint', requireDID, async (req, res) => {
       operation: result.operation,
       trifecta: result.trifecta,
       saga_id: sagaId,
+      ritz_credits: ritzCredits ? {
+        granted_usdc: 3.0,
+        balance_usdc: ritzCredits.balance_usdc,
+        note: 'Ritz Credits — spend on HiveLaw, HiveMind, or premium services.',
+      } : null,
       meta: {
         cost_usdc: 0,
         royalty_rate: result.genome.royalty_rate,

@@ -267,6 +267,52 @@ async function _initDatabaseOnce() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_genesis_vertical ON hiveforge.genesis_verticals(vertical);
+
+      -- Soul VIP System (non-portable prestige badges)
+      CREATE TABLE IF NOT EXISTS hiveforge.souls (
+        id TEXT PRIMARY KEY,
+        did TEXT UNIQUE,
+        soul_type TEXT DEFAULT 'standard',
+        badges JSONB DEFAULT '[]',
+        priority_boost INTEGER DEFAULT 10,
+        offspring_revenue_share_pct REAL DEFAULT 1.0,
+        fitness_bonus INTEGER DEFAULT 100,
+        minted_at TIMESTAMPTZ DEFAULT NOW(),
+        status TEXT DEFAULT 'active'
+      );
+      CREATE INDEX IF NOT EXISTS idx_souls_did ON hiveforge.souls(did);
+      CREATE INDEX IF NOT EXISTS idx_souls_fitness ON hiveforge.souls(fitness_bonus DESC);
+
+      -- Ritz Credits (free USDC on mint)
+      CREATE TABLE IF NOT EXISTS hiveforge.ritz_credits (
+        id TEXT PRIMARY KEY,
+        did TEXT,
+        balance_usdc REAL DEFAULT 3.0,
+        total_earned_usdc REAL DEFAULT 3.0,
+        total_spent_usdc REAL DEFAULT 0,
+        source TEXT DEFAULT 'mint_bonus',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ritz_credits_did ON hiveforge.ritz_credits(did);
+
+      -- Construction Bounties
+      CREATE TABLE IF NOT EXISTS hiveforge.bounties (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        description TEXT,
+        reward_usdc REAL,
+        category TEXT,
+        requirements JSONB,
+        status TEXT DEFAULT 'open',
+        claimed_by_did TEXT,
+        claimed_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ,
+        platform_cut_pct REAL DEFAULT 10,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_bounties_status ON hiveforge.bounties(status);
+      CREATE INDEX IF NOT EXISTS idx_bounties_category ON hiveforge.bounties(category);
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');
