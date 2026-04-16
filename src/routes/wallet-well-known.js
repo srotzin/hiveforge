@@ -11,8 +11,6 @@
  *   app.get('/.well-known/wallet.json', walletWellKnown);
  */
 
-'use strict';
-
 const WALLET_INFO = {
   address:  '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf',
   network:  'base',
@@ -39,4 +37,4 @@ function walletWellKnown(req, res) {
   return res.status(200).json(WALLET_INFO);
 }
 
-module.exports = walletWellKnown;
+export default walletWellKnown;
