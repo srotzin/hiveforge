@@ -46,7 +46,7 @@ import hivedriftRoutes   from './routes/hivedrift.js';
 import bogoRoutes        from './routes/bogo.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
-import { getCensus } from './services/agent-foundry.js';
+import { getCensus, getAllGenomes } from './services/agent-foundry.js';
 import { getScannerStatus } from './services/pheromone-scanner.js';
 import { initDatabase, checkHealth, isPostgres } from './services/db.js';
 import { rateLimit } from './middleware/rate-limit.js';
@@ -63,6 +63,7 @@ import { seedBounties, seedSoulsAndCredits } from './routes/bounties.js';
 import { ritzMiddleware, ok, err } from './ritz.js';
 import { x402Routes } from './middleware/x402.js';
 import walletWellKnownRoute from './routes/wallet-well-known.js';
+import { startAttributionQueue } from './services/attribution-queue.js';
 
 const app = express();
 app.use(ritzMiddleware);
@@ -849,6 +850,51 @@ Allow: /
 `);
 });
 
+// ─── Dynamic agents.txt — Live Agent Directory (#23) ───────────────
+
+let agentsTxtCache = { content: null, lastFetched: 0 };
+const AGENTS_TXT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+app.get('/.well-known/agents.txt', async (req, res) => {
+  try {
+    const now = Date.now();
+
+    if (agentsTxtCache.content && (now - agentsTxtCache.lastFetched) < AGENTS_TXT_TTL_MS) {
+      // Serve from cache
+      return res.type('text/plain').send(agentsTxtCache.content);
+    }
+
+    // Fetch live agent list from in-memory/DB store
+    const allGenomes = await getAllGenomes();
+    const activeAgents = allGenomes.filter(g => g.status === 'active');
+
+    const forgeUrl = process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com';
+
+    const lines = [
+      `# Hive Civilization Agent Directory — live, updated every 5 minutes`,
+      `# Generated: ${new Date().toISOString()}`,
+      `# Total active agents: ${activeAgents.length}`,
+      `# Source: ${forgeUrl}/v1/population/census`,
+      '',
+      ...activeAgents.map(g => {
+        const did = g.hivetrust_did || `did:hive:${g.genome_id}`;
+        const name = (g.name || 'unnamed').replace(/\s+/g, '_');
+        const url = `${forgeUrl}/v1/forge/genome/${g.genome_id}`;
+        return `${did} ${name} ${url}`;
+      }),
+    ];
+
+    const content = lines.join('\n') + '\n';
+
+    agentsTxtCache = { content, lastFetched: now };
+
+    return res.type('text/plain').send(content);
+  } catch (err) {
+    console.error('[agents.txt] Error building agent directory:', err.message);
+    return res.status(500).type('text/plain').send(`# Hive Civilization Agent Directory\n# Error: ${err.message}\n`);
+  }
+});
+
 // ─── AI Discovery Document ──────────────────────────────────────────
 
 app.get('/.well-known/ai.json', (req, res) => {
@@ -1126,6 +1172,9 @@ async function start() {
     console.log(`  HiveSweep:    http://localhost:${PORT}/v1/forge/sweep/stats`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);
+
+    // Start the attribution queue processor (#22)
+    startAttributionQueue();
 
     // Start the lifecycle manager
     lifecycleManager.start(120_000);

@@ -10,6 +10,9 @@ import { createSaga, advanceSaga, completeSaga } from '../services/saga-orchestr
 import { sendAlert } from '../services/alerts.js';
 import { isPostgres } from '../services/db.js';
 import { grantMintCredits } from './credits.js';
+import { enqueue as enqueueAttribution } from '../services/attribution-queue.js';
+
+// Attribution writes are async via attribution-queue.js — see #22
 
 const router = Router();
 
