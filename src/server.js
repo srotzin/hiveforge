@@ -1047,11 +1047,14 @@ app.use((req, res) => {
         hq_map:    'GET /v1/forge/tracker/hq/map — Simplified map view (auth required)',
       },
       hiveride: {
-        request:  'POST /v1/forge/hiveride/request — Request a ride (public)',
-        accept:   'POST /v1/forge/hiveride/:id/accept — Accept a ride (auth required)',
-        complete: 'POST /v1/forge/hiveride/:id/complete — Complete a ride (auth required)',
+        request:  'POST /v1/forge/hiveride/rides/request — Request a ride/task (public)',
+        accept:   'POST /v1/forge/hiveride/rides/:id/accept — Accept a dispatched ride (auth required)',
+        complete: 'POST /v1/forge/hiveride/rides/:id/complete — Complete + deliver output (auth required)',
         feed:     'GET /v1/forge/hiveride/feed — Live ride feed (public)',
         stats:    'GET /v1/forge/hiveride/stats — Platform stats (public)',
+        dashboard: 'GET /v1/forge/hiveride/dashboard — Full fleet HQ (auth required)',
+        services: 'GET /v1/forge/hiveride/services — Service catalog (public)',
+        surge:    'GET /v1/forge/hiveride/surge — Current surge pricing (public)',
       },
     },
   });

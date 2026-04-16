@@ -325,4 +325,82 @@ router.post('/rides/:id/rate', async (req, res) => {
   }
 });
 
+// ── Friendly aliases (match advertised endpoint paths) ──────────────────
+// /stats → summary of dashboard data (public)
+router.get('/stats', async (req, res) => {
+  // Pull from getDashboard but return a simplified stats shape
+  try {
+    const d = await getDashboard();
+    return res.json({
+      success: true,
+      data: {
+        total_rides: d.rides?.total || 0,
+        active_rides: d.rides?.active || 0,
+        completed_rides: d.rides?.completed || 0,
+        total_drivers: d.drivers?.total || 0,
+        online_drivers: d.drivers?.online || 0,
+        total_revenue_usdc: d.revenue?.total_usdc || 0,
+        surge_active: d.surge?.active || false,
+        surge_multiplier: d.surge?.multiplier || 1.0,
+        service_types: Object.keys(d.service_types || {}).length || 0,
+      },
+      meta: { note: 'HiveRide platform statistics.' }
+    });
+  } catch(e) {
+    return res.json({ success: true, data: { total_rides: 0, active_rides: 0, total_drivers: 0, online_drivers: 0, total_revenue_usdc: 0 } });
+  }
+});
+
+// /feed → public live ride feed (recent rides)
+router.get('/feed', async (req, res) => {
+  try {
+    const d = await getDashboard();
+    return res.json({
+      success: true,
+      data: {
+        feed: (d.recent_rides || []).filter(r => r.privacy !== 'sealed'),
+        count: (d.recent_rides || []).length,
+        privacy_note: 'SEALED rides never appear in feed — full anonymity via USAD on Aleo.'
+      }
+    });
+  } catch(e) {
+    return res.json({ success: true, data: { feed: [], count: 0 } });
+  }
+});
+
+// /request → alias for /rides/request (backwards compat)
+router.post('/request', async (req, res) => {
+  try {
+    const {
+      rider_did, rider_name, service_type, task_description,
+      payload, callback_url, max_fare_usdc, settlement_rail,
+    } = req.body || {};
+
+    if (!rider_did)        return res.status(400).json({ success: false, error: 'rider_did required.' });
+    if (!service_type)     return res.status(400).json({ success: false, error: 'service_type required.' });
+    if (!task_description) return res.status(400).json({ success: false, error: 'task_description required.' });
+
+    const result = await requestRide({
+      rider_did, rider_name, service_type, task_description,
+      payload, callback_url, max_fare_usdc, settlement_rail,
+    });
+
+    if (result.error) return res.status(402).json({ success: false, ...result });
+
+    return res.status(201).json({
+      success: true,
+      data: result,
+      meta: {
+        note: result.message,
+        poll_status: `GET /v1/forge/hiveride/rides/${result.ride_id}`,
+        no_drivers_tip: result.spawn_driver_url
+          ? `No drivers online. Spawn one at ${result.spawn_driver_url} or wait.`
+          : undefined,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;
