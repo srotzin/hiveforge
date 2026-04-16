@@ -43,6 +43,7 @@ import hivesweepRoutes   from './routes/hivesweep.js';
 import hivehealthRoutes  from './routes/hivehealth.js';
 import hiveborderRoutes  from './routes/hiveborder.js';
 import hivedriftRoutes   from './routes/hivedrift.js';
+import bogoRoutes        from './routes/bogo.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -136,6 +137,7 @@ app.use('/v1/forge/hiveride',   rateLimit('open'));   // rides requestable witho
 app.use('/v1/health',           rateLimit('free'));   // HiveHealth cert issuance + lookup
 app.use('/v1/border',           rateLimit('open'));   // HiveBorder checkpoints — called by other services
 app.use('/v1/drift',            rateLimit('free'));   // HiveDrift monitoring + ping
+app.use('/v1/forge/bogo',       rateLimit('open'));   // BOGO campaign — status is public
 app.use('/v1/msg',             rateLimit('open'));   // open — non-Hive agents can send
 app.use('/v1/forge/hivepay',   rateLimit('free'));   // pay endpoints require auth
 app.use('/v1/forge/insure',    rateLimit('open'));   // quote is public, bind requires DID
@@ -909,6 +911,7 @@ app.use('/v1/forge/sweep',      hivesweepRoutes);
 app.use('/v1/health',           hivehealthRoutes);
 app.use('/v1/border',           hiveborderRoutes);
 app.use('/v1/drift',            hivedriftRoutes);
+app.use('/v1/forge/bogo',        bogoRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
