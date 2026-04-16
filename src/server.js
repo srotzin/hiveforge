@@ -60,6 +60,8 @@ import { initSpawnerTables, startSpawnerLoop, isSpawnerRunning } from './service
 import { initVelvetRopeTables } from './services/velvet-rope.js';
 import { seedBounties, seedSoulsAndCredits } from './routes/bounties.js';
 import { ritzMiddleware, ok, err } from './ritz.js';
+import { x402Routes } from './middleware/x402.js';
+import walletWellKnownRoute from './routes/wallet-well-known.js';
 
 const app = express();
 app.use(ritzMiddleware);
@@ -172,6 +174,10 @@ app.get('/health', async (req, res) => {
 });
 
 // ─── Payment Discovery ───────────────────────────────────────────────
+
+// x402 payment discovery + wallet.json well-known
+x402Routes(app);
+app.use('/.well-known/wallet.json', walletWellKnownRoute);
 
 app.get('/.well-known/hive-payments.json', (req, res) => {
   res.json({
