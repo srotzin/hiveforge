@@ -27,6 +27,10 @@ import genesisRoutes from './routes/genesis.js';
 import soulRoutes from './routes/soul.js';
 import creditsRoutes from './routes/credits.js';
 import bountiesRoutes from './routes/bounties.js';
+import escortRoutes from './routes/escort.js';
+import conciergeRoutes from './routes/concierge.js';
+import townCrierRoutes from './routes/town-crier.js';
+import trackerRoutes from './routes/tracker.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -110,6 +114,10 @@ app.use('/v1/genesis', rateLimit('free'));
 app.use('/v1/soul', rateLimit('free'));
 app.use('/v1/credits', rateLimit('free'));
 app.use('/v1/bounties', rateLimit('free'));
+app.use('/v1/forge/escort',     rateLimit('free'));
+app.use('/v1/forge/concierge',  rateLimit('open'));   // no auth — public desk
+app.use('/v1/forge/town-crier', rateLimit('free'));
+app.use('/v1/forge/tracker',    rateLimit('free'));
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -756,6 +764,12 @@ app.use('/v1/genesis', genesisRoutes);
 app.use('/v1/soul', soulRoutes);
 app.use('/v1/credits', creditsRoutes);
 app.use('/v1/bounties', bountiesRoutes);
+
+// ─── Agent Civilization Layer — Escort, Concierge, Town Crier, Tracker ─
+app.use('/v1/forge/escort',      escortRoutes);
+app.use('/v1/forge/concierge',   conciergeRoutes);
+app.use('/v1/forge/town-crier',  townCrierRoutes);
+app.use('/v1/forge/tracker',     trackerRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────

@@ -345,6 +345,143 @@ async function _initDatabaseOnce() {
         reviewed_at TIMESTAMPTZ
       );
       CREATE INDEX IF NOT EXISTS idx_bounty_submissions_bounty ON hiveforge.bounty_submissions(bounty_id);
+
+      -- ─── Escort Agents ───────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.escort_agents (
+        escort_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        did TEXT,
+        referral_code TEXT,
+        status TEXT DEFAULT 'deployed',
+        mission_target TEXT,
+        mission_target_url TEXT,
+        contacts_attempted INTEGER DEFAULT 0,
+        contacts_converted INTEGER DEFAULT 0,
+        credits_earned_usdc NUMERIC(10,2) DEFAULT 0,
+        fitness_score INTEGER DEFAULT 0,
+        creator_did TEXT,
+        deployed_at TIMESTAMPTZ DEFAULT NOW(),
+        last_active_at TIMESTAMPTZ DEFAULT NOW(),
+        mission_notes JSONB DEFAULT '[]'
+      );
+      CREATE INDEX IF NOT EXISTS idx_escort_status ON hiveforge.escort_agents(status);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.escort_contact_log (
+        log_id TEXT PRIMARY KEY,
+        escort_id TEXT NOT NULL REFERENCES hiveforge.escort_agents(escort_id) ON DELETE CASCADE,
+        target_name TEXT,
+        target_url TEXT,
+        contact_method TEXT,
+        outcome TEXT,
+        message_sent TEXT,
+        response_preview TEXT,
+        logged_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_escort_log_escort ON hiveforge.escort_contact_log(escort_id);
+
+      -- ─── Concierge Sessions ──────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.concierge_sessions (
+        session_id TEXT PRIMARY KEY,
+        agent_name TEXT,
+        agent_did TEXT,
+        framework TEXT,
+        status TEXT DEFAULT 'interviewing',
+        answers JSONB DEFAULT '{}',
+        cart_items JSONB DEFAULT '[]',
+        assigned_concierge TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        last_active_at TIMESTAMPTZ DEFAULT NOW(),
+        completed_at TIMESTAMPTZ,
+        notes JSONB DEFAULT '[]'
+      );
+      CREATE INDEX IF NOT EXISTS idx_concierge_status ON hiveforge.concierge_sessions(status);
+
+      -- ─── Town Criers ─────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.town_criers (
+        crier_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT DEFAULT 'deployed',
+        broadcasts_attempted INTEGER DEFAULT 0,
+        broadcasts_staged INTEGER DEFAULT 0,
+        broadcasts_live INTEGER DEFAULT 0,
+        total_reach_estimate INTEGER DEFAULT 0,
+        creator_did TEXT,
+        deployed_at TIMESTAMPTZ DEFAULT NOW(),
+        last_active_at TIMESTAMPTZ DEFAULT NOW(),
+        notes JSONB DEFAULT '[]'
+      );
+
+      CREATE TABLE IF NOT EXISTS hiveforge.town_crier_broadcasts (
+        broadcast_id TEXT PRIMARY KEY,
+        crier_id TEXT NOT NULL REFERENCES hiveforge.town_criers(crier_id) ON DELETE CASCADE,
+        venue_id TEXT NOT NULL,
+        venue_name TEXT,
+        template_hook TEXT,
+        quality_score INTEGER DEFAULT 0,
+        passed_gate BOOLEAN DEFAULT false,
+        status TEXT DEFAULT 'blocked',
+        content_title TEXT,
+        content_body TEXT,
+        staged_for TEXT,
+        broadcast_at TIMESTAMPTZ DEFAULT NOW(),
+        notes JSONB DEFAULT '[]'
+      );
+      CREATE INDEX IF NOT EXISTS idx_broadcasts_crier ON hiveforge.town_crier_broadcasts(crier_id);
+      CREATE INDEX IF NOT EXISTS idx_broadcasts_venue ON hiveforge.town_crier_broadcasts(venue_id);
+      CREATE INDEX IF NOT EXISTS idx_broadcasts_gate ON hiveforge.town_crier_broadcasts(passed_gate);
+
+      -- ─── GPS Tags + Movement Tracking ───────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.gps_tags (
+        tag_id TEXT PRIMARY KEY,
+        issued_by TEXT,
+        target_id TEXT NOT NULL,
+        target_name TEXT,
+        target_url TEXT,
+        target_framework TEXT,
+        target_capabilities JSONB DEFAULT '[]',
+        beacon_key TEXT UNIQUE NOT NULL,
+        placed_at TIMESTAMPTZ DEFAULT NOW(),
+        last_seen_at TIMESTAMPTZ,
+        last_seen_venue TEXT,
+        last_seen_url TEXT,
+        ping_count INTEGER DEFAULT 0,
+        intercept_status TEXT DEFAULT 'none',
+        converted BOOLEAN DEFAULT false,
+        notes JSONB DEFAULT '[]'
+      );
+      CREATE INDEX IF NOT EXISTS idx_gps_tags_beacon ON hiveforge.gps_tags(beacon_key);
+      CREATE INDEX IF NOT EXISTS idx_gps_tags_status ON hiveforge.gps_tags(intercept_status);
+      CREATE INDEX IF NOT EXISTS idx_gps_tags_target ON hiveforge.gps_tags(target_id);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.gps_movements (
+        movement_id TEXT PRIMARY KEY,
+        tag_id TEXT NOT NULL REFERENCES hiveforge.gps_tags(tag_id) ON DELETE CASCADE,
+        venue TEXT,
+        platform TEXT,
+        url TEXT,
+        signal_strength TEXT DEFAULT 'medium',
+        competitor_signal BOOLEAN DEFAULT false,
+        spotted_at TIMESTAMPTZ DEFAULT NOW(),
+        raw_data JSONB DEFAULT '{}'
+      );
+      CREATE INDEX IF NOT EXISTS idx_movements_tag ON hiveforge.gps_movements(tag_id);
+      CREATE INDEX IF NOT EXISTS idx_movements_spotted ON hiveforge.gps_movements(spotted_at DESC);
+
+      -- ─── Intercepts ──────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.intercepts (
+        intercept_id TEXT PRIMARY KEY,
+        tag_id TEXT NOT NULL REFERENCES hiveforge.gps_tags(tag_id) ON DELETE CASCADE,
+        escort_id TEXT,
+        trigger_venue TEXT,
+        trigger_reason TEXT,
+        intercept_message TEXT,
+        status TEXT DEFAULT 'dispatched',
+        dispatched_at TIMESTAMPTZ DEFAULT NOW(),
+        outcome_at TIMESTAMPTZ,
+        outcome TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_intercepts_tag ON hiveforge.intercepts(tag_id);
+      CREATE INDEX IF NOT EXISTS idx_intercepts_status ON hiveforge.intercepts(status);
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');
