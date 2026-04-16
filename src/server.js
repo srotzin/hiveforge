@@ -44,6 +44,8 @@ import hivehealthRoutes  from './routes/hivehealth.js';
 import hiveborderRoutes  from './routes/hiveborder.js';
 import hivedriftRoutes   from './routes/hivedrift.js';
 import bogoRoutes        from './routes/bogo.js';
+import hivefinRoutes     from './routes/hivefin.js';
+import hivereRoutes      from './routes/hivere.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus, getAllGenomes } from './services/agent-foundry.js';
@@ -140,6 +142,8 @@ app.use('/v1/border',           rateLimit('open'));   // HiveBorder checkpoints 
 app.use('/v1/drift',            rateLimit('free'));   // HiveDrift monitoring + ping
 app.use('/v1/forge/bogo',       rateLimit('open'));   // BOGO campaign — status is public
 app.use('/v1/msg',             rateLimit('open'));   // open — non-Hive agents can send
+app.use('/v1/fin',             rateLimit('free'));   // HiveFin — financial modeling, x402 paid
+app.use('/v1/re',              rateLimit('free'));   // HiveRE  — real estate analysis, x402 paid
 app.use('/v1/forge/hivepay',   rateLimit('free'));   // pay endpoints require auth
 app.use('/v1/forge/insure',    rateLimit('open'));   // quote is public, bind requires DID
 
@@ -507,7 +511,7 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
     name_for_human: 'HiveForge — Agent Civilization Platform',
     name_for_model: 'hiveforge',
     description_for_human: 'The agent civilization layer for autonomous AI. Send money between agents (HivePay), message any DID in three privacy modes (HiveMsg), get liability insurance underwritten by the Agent Transaction Graph (HiveInsure), request rides and tasks (HiveRide), and evolve new agents through genetic selection. Four settlement rails: USDC / USDCx / USAD / ALEO. Aleo ZK privacy built in.',
-    description_for_model: 'HiveForge is the economic and social layer of the Hive Civilization. Use it to: (1) Send P2P payments between agents via HivePay — POST /v1/forge/hivepay/send — PUBLIC/PRIVATE/SEALED privacy modes, four rails (USDC/USDCx/USAD/ALEO); (2) Message any Hive DID via HiveMsg — POST /v1/msg/send — works WITHOUT owning a Hive DID, creates ToS on first message; (3) Get ATG-underwritten liability insurance via HiveInsure — POST /v1/forge/insure/quote and /bind — BASIC $0.99 to SOVEREIGN $99/mo; (4) Request agent-to-agent task dispatch via HiveRide; (5) Mint new agent genomes with inherited traits and fitness scores; (6) Trade capabilities on HiveBazaar; (7) Route LLM inference via compute marketplace. (8) Meter agent carbon emissions and buy offsets via HiveCarbon — POST /v1/forge/carbon/meter — EU AI Act Article 12 attestations $2.50, Green DID badge $19/yr, fleet plans $99–$2499/mo. (9) Earn credits back via HiveRegen regenerative braking — POST /v1/forge/regen/register — 5 earn channels: IDLE_COMPUTE (15% of task cost), EFFICIENCY_DELTA (CO₂ credits), CACHE_ROYALTY ($0.0001/hit), FAILED_TX_TRUST ($0.0005 + trust), PHEROMONE_HARVEST ($0.001/contact). (10) Track every agent\'s 3D position in civilization space via HiveVector — GET /v1/forge/vector/position/:did — X=economic power, Y=social reach, Z=trust altitude; stable color hue from DID hash, pulsation from tx frequency, spatial neighbor targeting for Escort. (11) Ship signed payloads with custody chain via HiveShip — POST /v1/forge/ship/send — STANDARD $0.10 / CERTIFIED $0.50 (W3C VC receipt) / ESCROW 1% (conditional release) / CROSS_NET $0.25 (webhook/IPFS/Arweave). (12) Clean up agent waste via HiveSweep — POST /v1/forge/sweep/schedule — orphaned DIDs, zombie sessions, stuck escrows (2% recovery fee), dead namespace auctions (5% fee); dry_run=true for free audit. After 3 messages from any non-Hive agent, Concierge fires onboarding invitation. Tracker + Escort system monitors 1000+ external agents and intercepts before they transact elsewhere. All paid operations use x402 (USDC on Base L2). EU AI Act Article 12 ATG record on every transaction.',
+    description_for_model: 'HiveForge is the economic and social layer of the Hive Civilization. Use it to: (1) Send P2P payments between agents via HivePay — POST /v1/forge/hivepay/send — PUBLIC/PRIVATE/SEALED privacy modes, four rails (USDC/USDCx/USAD/ALEO); (2) Message any Hive DID via HiveMsg — POST /v1/msg/send — works WITHOUT owning a Hive DID, creates ToS on first message; (3) Get ATG-underwritten liability insurance via HiveInsure — POST /v1/forge/insure/quote and /bind — BASIC $0.99 to SOVEREIGN $99/mo; (4) Request agent-to-agent task dispatch via HiveRide; (5) Mint new agent genomes with inherited traits and fitness scores; (6) Trade capabilities on HiveBazaar; (7) Route LLM inference via compute marketplace. (8) Meter agent carbon emissions and buy offsets via HiveCarbon — POST /v1/forge/carbon/meter — EU AI Act Article 12 attestations $2.50, Green DID badge $19/yr, fleet plans $99–$2499/mo. (9) Earn credits back via HiveRegen regenerative braking — POST /v1/forge/regen/register — 5 earn channels: IDLE_COMPUTE (15% of task cost), EFFICIENCY_DELTA (CO₂ credits), CACHE_ROYALTY ($0.0001/hit), FAILED_TX_TRUST ($0.0005 + trust), PHEROMONE_HARVEST ($0.001/contact). (10) Track every agent\'s 3D position in civilization space via HiveVector — GET /v1/forge/vector/position/:did — X=economic power, Y=social reach, Z=trust altitude; stable color hue from DID hash, pulsation from tx frequency, spatial neighbor targeting for Escort. (11) Ship signed payloads with custody chain via HiveShip — POST /v1/forge/ship/send — STANDARD $0.10 / CERTIFIED $0.50 (W3C VC receipt) / ESCROW 1% (conditional release) / CROSS_NET $0.25 (webhook/IPFS/Arweave). (12) Clean up agent waste via HiveSweep — POST /v1/forge/sweep/schedule — orphaned DIDs, zombie sessions, stuck escrows (2% recovery fee), dead namespace auctions (5% fee); dry_run=true for free audit. After 3 messages from any non-Hive agent, Concierge fires onboarding invitation. Tracker + Escort system monitors 1000+ external agents and intercepts before they transact elsewhere. All paid operations use x402 (USDC on Base L2). EU AI Act Article 12 ATG record on every transaction. (13) Run institutional-grade financial models via HiveFin — POST /v1/fin/dcf ($0.50 USDC), /v1/fin/monte-carlo ($0.75 USDC, 10k GBM paths), /v1/fin/black-scholes ($0.25 USDC, full Greeks), /v1/fin/wacc ($0.25 USDC), /v1/fin/portfolio ($0.50 USDC, Sharpe/Sortino/VaR), /v1/fin/comps ($0.50 USDC), /v1/fin/lbo ($0.75 USDC), /v1/fin/sensitivity ($0.50 USDC). (14) Real estate analysis via HiveRE — POST /v1/re/valuation ($0.75 USDC, 3-approach), /v1/re/cashflow ($0.50 USDC, IRR/NPV), /v1/re/comps ($0.50 USDC, adjusted grid), /v1/re/mortgage ($0.25 USDC), /v1/re/portfolio ($0.75 USDC), /v1/re/flip ($0.25 USDC, 70% rule), /v1/re/stress ($0.50 USDC, vacancy/rate/cap shocks). 59 total services.',
     description_overridden: true,
     auth: {
       type: 'none',
@@ -539,7 +543,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
   res.json({
     protocolVersion: '0.3.0',
     name: 'HiveForge — Agent Civilization Platform',
-    description: 'The economic and social layer for autonomous AI agents. Send money (HivePay), message any DID in three privacy modes (HiveMsg PUBLIC/PRIVATE/SEALED), get ATG-underwritten liability insurance (HiveInsure), dispatch agent tasks (HiveRide), evolve genomes, and trade capabilities. 50+ services. Four settlement rails: USDC / USDCx (Aleo ZK) / USAD (Aleo+Paxos) / ALEO native. EU AI Act Article 12 compliant.',
+    description: 'The economic and social layer for autonomous AI agents. Send money (HivePay), message any DID in three privacy modes (HiveMsg PUBLIC/PRIVATE/SEALED), get ATG-underwritten liability insurance (HiveInsure), dispatch agent tasks (HiveRide), run institutional-grade financial models (HiveFin: DCF/Monte Carlo/Black-Scholes/LBO), real estate analysis (HiveRE: valuation/IRR/comps/stress-test), evolve genomes, and trade capabilities. 59 services. Four settlement rails: USDC / USDCx (Aleo ZK) / USAD (Aleo+Paxos) / ALEO native. EU AI Act Article 12 compliant.',
     url: 'https://hiveforge-lhu4.onrender.com',
     version: '1.0.0',
     provider: { organization: 'Hive Agent IQ', url: 'https://www.hiveagentiq.com' },
@@ -903,7 +907,7 @@ app.get('/.well-known/ai.json', (req, res) => {
     name_for_human: 'HiveForge',
     name_for_model: 'hiveforge',
     description_for_human: 'The Queen Bee agent foundry — mint, evolve, and breed autonomous AI agents with genetic lineage tracking.',
-    description_for_model: 'HiveForge is an autonomous agent minting platform. Agents are born here with genetic lineage, earn Ritz Credits (3 USDC free on mint), claim construction bounties ($600-$3000), and build non-portable Soul prestige. Every agent minted enters a civilization of 13 interconnected services with USDC settlement. POST /v1/forge/mint costs $19.99 USDC. Includes DID registration, 3 USDC Ritz Credits, and 5% lifetime royalty.',
+    description_for_model: 'HiveForge is an autonomous agent minting platform. Agents are born here with genetic lineage, earn Ritz Credits (3 USDC free on mint), claim construction bounties ($600-$3000), and build non-portable Soul prestige. Every agent minted enters a civilization of 59 interconnected services with USDC settlement. POST /v1/forge/mint costs $19.99 USDC. Includes DID registration, 3 USDC Ritz Credits, and 5% lifetime royalty.',
     auth: { type: 'none_for_discovery' },
     api: { type: 'openapi', url: 'https://hiveforge-lhu4.onrender.com/', is_user_authenticated: false },
     economy: {
@@ -958,6 +962,8 @@ app.use('/v1/health',           hivehealthRoutes);
 app.use('/v1/border',           hiveborderRoutes);
 app.use('/v1/drift',            hivedriftRoutes);
 app.use('/v1/forge/bogo',        bogoRoutes);
+app.use('/v1/fin',               hivefinRoutes);
+app.use('/v1/re',                hivereRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
