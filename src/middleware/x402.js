@@ -6,8 +6,6 @@
  * Protocol reference: https://x402.org
  */
 
-'use strict';
-
 const HIVE_RECIPIENT = '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf';
 const HIVE_NETWORK   = 'base';
 const HIVE_ASSET     = 'USDC';
@@ -83,7 +81,7 @@ function verifyPaymentSignature(header) {
  * @param {number} priceUsdc - price in USDC
  * @returns {Function} Express middleware
  */
-function requirePayment(priceUsdc = 0.01) {
+function requirePayment(priceUsdc = 0.01, _label) {
   return function x402PaymentMiddleware(req, res, next) {
     const paymentHeader = req.headers['payment-signature'];
 
@@ -127,7 +125,7 @@ function x402Routes(app) {
   });
 }
 
-module.exports = {
+export {
   requirePayment,
   x402Routes,
   buildPaymentRequirements,
