@@ -761,6 +761,109 @@ async function _initDatabaseOnce() {
       CREATE INDEX IF NOT EXISTS idx_idle_registrations_did    ON hiveforge.idle_registrations(did);
       CREATE INDEX IF NOT EXISTS idx_idle_registrations_status ON hiveforge.idle_registrations(status);
       CREATE INDEX IF NOT EXISTS idx_idle_registrations_expiry ON hiveforge.idle_registrations(expires_at);
+
+      -- ─── HiveVector ───────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.vector_positions (
+        did                    TEXT PRIMARY KEY,
+        x                      NUMERIC(10,4) NOT NULL DEFAULT 0,
+        y                      NUMERIC(10,4) NOT NULL DEFAULT 0,
+        z                      NUMERIC(10,4) NOT NULL DEFAULT 0,
+        hue                    INTEGER NOT NULL DEFAULT 0,
+        saturation             NUMERIC(6,2) NOT NULL DEFAULT 20,
+        brightness             NUMERIC(6,2) NOT NULL DEFAULT 20,
+        ring_color             TEXT NOT NULL DEFAULT '#4a4a4a',
+        pulsation_hz           NUMERIC(8,4) NOT NULL DEFAULT 0,
+        pulse_radius           INTEGER NOT NULL DEFAULT 1,
+        agent_size             TEXT NOT NULL DEFAULT 'NANO',
+        efficiency_class       TEXT NOT NULL DEFAULT 'PARASITIC',
+        velocity_magnitude     NUMERIC(10,4) NOT NULL DEFAULT 0,
+        payment_volume_usdc    NUMERIC(18,4) NOT NULL DEFAULT 0,
+        message_reach          INTEGER NOT NULL DEFAULT 0,
+        trust_score            INTEGER NOT NULL DEFAULT 0,
+        regen_rate             NUMERIC(10,6) NOT NULL DEFAULT 0,
+        fitness_score          NUMERIC(6,4) NOT NULL DEFAULT 0.5,
+        computed_at            TIMESTAMPTZ DEFAULT NOW(),
+        created_at             TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_vector_x   ON hiveforge.vector_positions(x);
+      CREATE INDEX IF NOT EXISTS idx_vector_y   ON hiveforge.vector_positions(y);
+      CREATE INDEX IF NOT EXISTS idx_vector_z   ON hiveforge.vector_positions(z);
+      CREATE INDEX IF NOT EXISTS idx_vector_size ON hiveforge.vector_positions(agent_size);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.vector_trails (
+        id             BIGSERIAL PRIMARY KEY,
+        did            TEXT NOT NULL,
+        x              NUMERIC(10,4) NOT NULL,
+        y              NUMERIC(10,4) NOT NULL,
+        z              NUMERIC(10,4) NOT NULL,
+        recorded_at    TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_vector_trails_did ON hiveforge.vector_trails(did);
+      CREATE INDEX IF NOT EXISTS idx_vector_trails_ts  ON hiveforge.vector_trails(recorded_at DESC);
+
+      -- ─── HiveShip ─────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.hiveship_shipments (
+        shipment_id          TEXT PRIMARY KEY,
+        sender_did           TEXT NOT NULL,
+        recipient            TEXT NOT NULL,
+        recipient_type       TEXT NOT NULL DEFAULT 'did',
+        type                 TEXT NOT NULL DEFAULT 'STANDARD',
+        status               TEXT NOT NULL DEFAULT 'PENDING',
+        payload              JSONB DEFAULT '{}',
+        payload_hash         TEXT,
+        payload_value_usdc   NUMERIC(14,4) DEFAULT 0,
+        fee_usdc             NUMERIC(10,4) DEFAULT 0,
+        rail                 TEXT NOT NULL DEFAULT 'usdc',
+        custody_chain        JSONB DEFAULT '[]',
+        note                 TEXT,
+        scheduled_at         TIMESTAMPTZ,
+        expires_at           TIMESTAMPTZ NOT NULL,
+        delivered_at         TIMESTAMPTZ,
+        created_at           TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hiveship_sender    ON hiveforge.hiveship_shipments(sender_did);
+      CREATE INDEX IF NOT EXISTS idx_hiveship_status    ON hiveforge.hiveship_shipments(status);
+      CREATE INDEX IF NOT EXISTS idx_hiveship_type      ON hiveforge.hiveship_shipments(type);
+      CREATE INDEX IF NOT EXISTS idx_hiveship_expires   ON hiveforge.hiveship_shipments(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_hiveship_created   ON hiveforge.hiveship_shipments(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hiveship_receipts (
+        receipt_id     TEXT PRIMARY KEY,
+        shipment_id    TEXT NOT NULL REFERENCES hiveforge.hiveship_shipments(shipment_id),
+        vc_json        JSONB NOT NULL,
+        issued_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hiveship_receipts_shipment ON hiveforge.hiveship_receipts(shipment_id);
+
+      -- ─── HiveSweep ─────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.sweep_jobs (
+        job_id               TEXT PRIMARY KEY,
+        did                  TEXT NOT NULL,
+        categories           JSONB NOT NULL DEFAULT '[]',
+        status               TEXT NOT NULL DEFAULT 'QUEUED',
+        dry_run              BOOLEAN NOT NULL DEFAULT false,
+        plan                 TEXT NOT NULL DEFAULT 'PAY_AS_YOU_GO',
+        estimated_items      INTEGER DEFAULT 0,
+        estimated_fee_usdc   NUMERIC(10,4) DEFAULT 0,
+        total_items_cleared  INTEGER DEFAULT 0,
+        total_fee_usdc       NUMERIC(10,4) DEFAULT 0,
+        total_recovered_usdc NUMERIC(14,4) DEFAULT 0,
+        sweep_log            JSONB DEFAULT '[]',
+        queued_at            TIMESTAMPTZ DEFAULT NOW(),
+        completed_at         TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_sweep_jobs_did    ON hiveforge.sweep_jobs(did);
+      CREATE INDEX IF NOT EXISTS idx_sweep_jobs_status ON hiveforge.sweep_jobs(status);
+      CREATE INDEX IF NOT EXISTS idx_sweep_jobs_queued ON hiveforge.sweep_jobs(queued_at DESC);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.sweep_subscriptions (
+        did           TEXT PRIMARY KEY,
+        plan          TEXT NOT NULL DEFAULT 'PAY_AS_YOU_GO',
+        monthly_usdc  NUMERIC(10,4) NOT NULL DEFAULT 0,
+        max_items     INTEGER,
+        subscribed_at TIMESTAMPTZ DEFAULT NOW(),
+        renewed_at    TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');
