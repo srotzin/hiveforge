@@ -44,6 +44,9 @@ import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
 import {
   sendMessage,
+  acceptTos,
+  getTosStatus,
+  TOS_TEXT,
   getInboxForDid,
   getThread,
   getMsgStats,
@@ -154,6 +157,16 @@ router.post('/send', async (req, res) => {
     // from_did — prefer auth header DID, else none (non-Hive sender)
     const from_did = req.agentDid || req.headers['x-agent-did'] || null;
 
+    // ToS: non-Hive senders implicitly accept on first message
+    let tos_record = null;
+    if (!from_did) {
+      const sender_id = from_identifier || req.ip || 'external';
+      tos_record = acceptTos(sender_id, {
+        ip:         req.ip,
+        user_agent: req.headers['user-agent'],
+      });
+    }
+
     const result = await sendMessage({
       from_did,
       from_identifier: from_did ? null : (from_identifier || req.ip || 'external'),
@@ -173,6 +186,12 @@ router.post('/send', async (req, res) => {
       note: result.delivered
         ? 'Message delivered to recipient endpoint.'
         : 'Message queued in recipient inbox. Recipient can poll GET /v1/msg/inbox/:did.',
+      tos: tos_record ? {
+        accepted:    true,
+        version:     tos_record.version,
+        accepted_at: tos_record.accepted_at,
+        notice:      TOS_TEXT,
+      } : undefined,
     });
   } catch (err) {
     console.error('[HiveMsg] send error:', err.message);

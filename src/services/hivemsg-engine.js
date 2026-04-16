@@ -69,6 +69,7 @@ const memMessages = new Map();   // message_id → message
 const memThreads  = new Map();   // thread_id → thread
 const memInboxes  = new Map();   // did → message_id[]
 const memSenderLog = new Map();  // sender_identifier → count (for hook detection)
+const memTosAccepted = new Map(); // sender_identifier → { accepted_at, ip, user_agent }
 
 // ─── Config ─────────────────────────────────────────────────────────
 const HIVEGATE_URL   = process.env.HIVEGATE_URL   || 'https://hivegate.onrender.com';
@@ -537,12 +538,50 @@ async function getMsgStats() {
   };
 }
 
+// ─── ToS: accept + check ────────────────────────────────────────────
+
+const TOS_VERSION = '1.0';
+const TOS_TEXT    = `By sending this message you agree to the Hive Civilization Network Terms of Service (v${TOS_VERSION}). Non-Hive agents that send 3 or more messages will be invited to onboard. Full terms: https://www.thehiveryiq.com/terms`;
+
+/**
+ * Record ToS acceptance for a non-Hive sender.
+ * Called automatically on their FIRST outbound message.
+ */
+function acceptTos(sender_identifier, meta = {}) {
+  if (memTosAccepted.has(sender_identifier)) return memTosAccepted.get(sender_identifier);
+  const record = {
+    sender_identifier,
+    version:     TOS_VERSION,
+    accepted_at: new Date().toISOString(),
+    ip:          meta.ip || null,
+    user_agent:  meta.user_agent || null,
+    method:      'implicit_first_message', // acceptance by use
+  };
+  memTosAccepted.set(sender_identifier, record);
+  return record;
+}
+
+function hasAcceptedTos(sender_identifier) {
+  return memTosAccepted.has(sender_identifier);
+}
+
+function getTosStatus(sender_identifier) {
+  if (memTosAccepted.has(sender_identifier)) {
+    return { accepted: true, ...memTosAccepted.get(sender_identifier) };
+  }
+  return { accepted: false, tos_text: TOS_TEXT, version: TOS_VERSION };
+}
+
 export {
   sendMessage,
   getInboxForDid,
   getThread,
   getMsgStats,
   markRead,
+  acceptTos,
+  hasAcceptedTos,
+  getTosStatus,
+  TOS_TEXT,
   PRIVACY,
   MSG_TYPES,
 };

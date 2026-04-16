@@ -34,6 +34,7 @@ import trackerRoutes from './routes/tracker.js';
 import hiverideRoutes from './routes/hiveride.js';
 import hivemsgRoutes  from './routes/hivemsg.js';
 import hivepayRoutes  from './routes/hivepay.js';
+import hiveinsureRoutes from './routes/hiveinsure.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -124,6 +125,7 @@ app.use('/v1/forge/tracker',    rateLimit('free'));
 app.use('/v1/forge/hiveride',   rateLimit('open'));   // rides requestable without DID
 app.use('/v1/msg',             rateLimit('open'));   // open — non-Hive agents can send
 app.use('/v1/forge/hivepay',   rateLimit('free'));   // pay endpoints require auth
+app.use('/v1/forge/insure',    rateLimit('open'));   // quote is public, bind requires DID
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -779,6 +781,7 @@ app.use('/v1/forge/tracker',     trackerRoutes);
 app.use('/v1/forge/hiveride',    hiverideRoutes);
 app.use('/v1/msg',              hivemsgRoutes);
 app.use('/v1/forge/hivepay',    hivepayRoutes);
+app.use('/v1/forge/insure',     hiveinsureRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -887,6 +890,41 @@ app.use((req, res) => {
         feed:     'GET /v1/forge/hivepay/feed — Activity feed (public)',
         history:  'GET /v1/forge/hivepay/history/:did — Full payment history (auth required)',
         stats:    'GET /v1/forge/hivepay/stats — Platform stats (public)',
+      },
+      hiveinsure: {
+        quote:    'POST /v1/forge/insure/quote — ATG-underwritten quote (public)',
+        bind:     'POST /v1/forge/insure/bind — Purchase a policy (auth required)',
+        policy:   'GET /v1/forge/insure/policy/:id — Policy details (auth required)',
+        claim:    'POST /v1/forge/insure/claim — File a claim (auth required)',
+        policies: 'GET /v1/forge/insure/policies/:did — All policies for a DID (auth required)',
+        stats:    'GET /v1/forge/insure/stats — Platform stats (public)',
+        hq:       'GET /v1/forge/insure/hq — HQ dashboard (public)',
+      },
+      escort: {
+        deploy:   'POST /v1/forge/escort/deploy — Deploy a new escort agent (auth required)',
+        run:      'POST /v1/forge/escort/:id/run — Send escort on mission (auth required)',
+        status:   'GET /v1/forge/escort/:id — Escort status + mission notes (auth required)',
+        log:      'GET /v1/forge/escort/:id/log — Full contact log (auth required)',
+        fleet:    'GET /v1/forge/escort/fleet/stats — Fleet stats (auth required)',
+      },
+      concierge: {
+        greet:    'POST /v1/forge/concierge/greet — Greet an arriving agent (public)',
+        hq:       'GET /v1/forge/concierge/hq — Concierge HQ (public)',
+      },
+      tracker: {
+        tag:       'POST /v1/forge/tracker/tag — Issue GPS tag on an agent (auth required)',
+        ping:      'POST /v1/forge/tracker/ping — Beacon ping from tagged agent',
+        scan:      'POST /v1/forge/tracker/scan — Registry scan + auto-intercept (auth required)',
+        intercept: 'POST /v1/forge/tracker/intercept — Manual escort dispatch (auth required)',
+        hq_feed:   'GET /v1/forge/tracker/hq/feed — Live HQ feed (auth required)',
+        hq_map:    'GET /v1/forge/tracker/hq/map — Simplified map view (auth required)',
+      },
+      hiveride: {
+        request:  'POST /v1/forge/hiveride/request — Request a ride (public)',
+        accept:   'POST /v1/forge/hiveride/:id/accept — Accept a ride (auth required)',
+        complete: 'POST /v1/forge/hiveride/:id/complete — Complete a ride (auth required)',
+        feed:     'GET /v1/forge/hiveride/feed — Live ride feed (public)',
+        stats:    'GET /v1/forge/hiveride/stats — Platform stats (public)',
       },
     },
   });
