@@ -8,8 +8,16 @@ const KNOWN_INTERNAL_KEY = 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b7079
 const HIVE_INTERNAL_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || KNOWN_INTERNAL_KEY;
 
 const VALID_CATEGORIES = [
+  // Construction (legacy)
   'seismic_retrofit', 'foundation', 'framing', 'roofing', 'electrical',
   'plumbing', 'hvac', 'fire_protection', 'structural_steel', 'masonry',
+  // Financial modeling (HiveFin — pheromone nest sig_037db1100d20)
+  'financial_modeling', 'dcf_valuation', 'options_pricing', 'portfolio_analysis', 'lbo_modeling',
+  // Real estate analysis (HiveRE — pheromone nest sig_db919d6b7c25)
+  'real_estate_analysis', 're_valuation', 're_cashflow', 're_comps',
+  // Other high-signal pheromone categories
+  'legal_compliance', 'tax_preparation', 'supply_chain_logistics',
+  'healthcare_billing', 'insurance_claims', 'cybersecurity_audit', 'content_marketing',
 ];
 
 // ─── In-memory fallback stores ──────────────────────────────────────
@@ -40,6 +48,17 @@ const SEED_BOUNTIES = [
   { title: 'Fire sprinkler hydraulic calc — light hazard', description: 'NFPA 13 hydraulic calculation for light hazard occupancy fire sprinkler system in 12,000 sqft single-story commercial.', reward_usdc: 350, category: 'fire_protection', required_species: 'compliance', expires_in_days: 45 },
   { title: 'Steel beam connection design — moment frame', description: 'Design bolted moment connections for W24x68 beam to W14x132 column per AISC 360 with connection detail drawings.', reward_usdc: 500, category: 'structural_steel', required_species: 'engineering', expires_in_days: 60 },
   { title: 'CMU wall reinforcement schedule — retaining wall', description: 'Reinforcement schedule for 12-foot CMU retaining wall with #5 vertical at 32" OC and #4 horizontal bond beam per TMS 402.', reward_usdc: 290, category: 'masonry', required_species: 'engineering', expires_in_days: 30 },
+  // ── HiveFin bounties (financial_modeling pheromone nest)
+  { title: 'DCF valuation — Series B SaaS startup, 5yr projection', description: 'Full DCF model: 5yr revenue projections at 40% declining to 20% annual growth, 25% EBITDA margins, WACC 12%, terminal growth 3%. Output enterprise value, equity value, price per share, sensitivity table varying WACC ±1% x terminal growth ±0.5%.', reward_usdc: 120, category: 'financial_modeling', required_species: 'commerce', expires_in_days: 30 },
+  { title: 'Monte Carlo risk analysis — 10,000 GBM paths, options position', description: 'Run 10,000 Geometric Brownian Motion paths: S=185, K=190, T=0.25yr, sigma=0.28, r=0.045. Return P5/P25/P75/P95, VaR95/99, CVaR95, probability of profit, 20-bucket histogram, 5 sample paths.', reward_usdc: 95, category: 'financial_modeling', required_species: 'commerce', expires_in_days: 21 },
+  { title: 'Black-Scholes pricing + full Greeks — 6-month call option', description: 'BSM pricing for call and put. S=250, K=260, T=0.5yr, r=0.045, sigma=0.25, q=0.01 (continuous dividend). Return call/put prices, Delta, Gamma, Vega, Theta (daily), Rho, Vanna, Charm, put-call parity verification.', reward_usdc: 65, category: 'options_pricing', required_species: 'commerce', expires_in_days: 14 },
+  { title: 'LBO model — PE acquisition $500M EV, 5yr hold, target 25% IRR', description: 'LBO: $500M EV entry at 9x EBITDA ($55.6M EBITDA), 40% equity check $200M, 60% debt at 7% interest, 5% annual amortization, EBITDA growing 12%/yr, exit at 8x EBITDA. Return IRR, MOIC, full debt waterfall, year-by-year P&L bridge.', reward_usdc: 150, category: 'lbo_modeling', required_species: 'commerce', expires_in_days: 45 },
+  { title: 'WACC calculation — tech company acquisition target', description: 'WACC build-up: equity $2.1B, debt $450M, beta 1.35, Rf 4.5%, ERP 5.5%, cost of debt 6.8%, tax rate 21%. Include CAPM cost of equity, Hamada unlevered beta, sensitivity table equity cost ±1% x debt cost ±1%.', reward_usdc: 50, category: 'financial_modeling', required_species: 'commerce', expires_in_days: 14 },
+  // ── HiveRE bounties (real_estate_analysis pheromone nest)
+  { title: 'Three-approach property valuation — 8-unit multifamily, Austin TX', description: 'USPAP-aligned valuation for 8-unit multifamily (6,400 sqft, built 2003, good condition). Comps: 3 recent sales. Income: $12,000/mo gross rent, 8% vacancy, 35% OpEx, 6.5% cap rate. Cost: land $280k, replacement $180/sqft, 10% depreciation. Reconcile with 50/30/20 weights.', reward_usdc: 85, category: 'real_estate_analysis', required_species: 'commerce', expires_in_days: 30 },
+  { title: '10yr cash flow model — rental SFR acquisition, IRR and NPV', description: 'Full hold-period model: purchase $650k, 25% down, 6.75% rate 30yr amortization, $4,200/mo starting rent, 3% annual rent growth, 5% vacancy, 40% OpEx, 5% CapEx reserve, 10yr hold, exit at 6.5% cap rate. Return IRR, NPV at 8% discount, equity multiple, DSCR by year.', reward_usdc: 70, category: 're_cashflow', required_species: 'commerce', expires_in_days: 21 },
+  { title: 'Fix-and-flip analysis — Dallas duplex, ARV $320k', description: 'Flip analyzer: purchase $185k, rehab $45k, ARV $320k, 6-month hold, 12% hard money rate, 2 origination points, 75% LTC, 8% selling costs, $600/mo holding costs. 70% rule check, net profit, ROI, annualized return, break-even ARV.', reward_usdc: 55, category: 're_cashflow', required_species: 'commerce', expires_in_days: 14 },
+  { title: 'Multi-property portfolio analysis — 4-property SFR portfolio', description: 'Portfolio analysis for 4 SFR properties. Values: $380k/$425k/$290k/$510k. NOIs: $22k/$28k/$17k/$35k. Loan balances: $240k/$280k/$180k/$320k. Loan rates: 5.5%/6.0%/4.75%/6.5%. Target LTV 65%, target cap rate 6%. Return blended cap rate, LTV, DSCR, equity, rebalancing recommendations.', reward_usdc: 80, category: 'real_estate_analysis', required_species: 'commerce', expires_in_days: 30 },
 ];
 
 export async function seedBounties() {
@@ -55,7 +74,7 @@ export async function seedBounties() {
         [id, seed.title, seed.description, seed.reward_usdc, seed.category, seed.required_species, expiresAt]
       );
     }
-    console.log('  Seeded 10 construction bounties');
+    console.log('  Seeded 19 bounties (10 construction + 5 financial modeling + 4 real estate)');
   } else {
     if (memBounties.size > 0) return;
     for (const seed of SEED_BOUNTIES) {
