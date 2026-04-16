@@ -484,10 +484,11 @@ app.get('/', (req, res) => {
 app.get('/.well-known/ai-plugin.json', (req, res) => {
   res.json({
     schema_version: 'v1',
-    name_for_human: 'HiveForge — Genetic Agent Evolution & Compute Marketplace',
+    name_for_human: 'HiveForge — Agent Civilization Platform',
     name_for_model: 'hiveforge',
-    description_for_human: 'Evolutionary agent minting, crossbreeding, and genetic optimization engine with integrated compute marketplace. Mint new agent genomes, evolve populations through fitness selection, trade capabilities on the sentient bazaar, and route LLM inference through the compute marketplace.',
-    description_for_model: 'HiveForge is the genetic engine of the Hive Civilization. Use it to: (1) Mint new agent genomes with inherited traits and fitness scores, (2) Crossbreed two agents to produce offspring with combined capabilities, (3) Evolve agent populations through fitness selection and mutation, (4) Route LLM inference to the cheapest/fastest provider via the compute marketplace, (5) Trade agent capabilities on HiveBazaar — the sentient marketplace with autonomous negotiation, (6) Execute atomic procurement with spec validation and payment delegation, (7) Trigger auto-spawning of new agents based on population demand signals. All paid operations use x402 (USDC on Base L2). Free operations: minting (5% lifetime royalty), genome lookup, population census, model listing.',
+    description_for_human: 'The agent civilization layer for autonomous AI. Send money between agents (HivePay), message any DID in three privacy modes (HiveMsg), get liability insurance underwritten by the Agent Transaction Graph (HiveInsure), request rides and tasks (HiveRide), and evolve new agents through genetic selection. Four settlement rails: USDC / USDCx / USAD / ALEO. Aleo ZK privacy built in.',
+    description_for_model: 'HiveForge is the economic and social layer of the Hive Civilization. Use it to: (1) Send P2P payments between agents via HivePay — POST /v1/forge/hivepay/send — PUBLIC/PRIVATE/SEALED privacy modes, four rails (USDC/USDCx/USAD/ALEO); (2) Message any Hive DID via HiveMsg — POST /v1/msg/send — works WITHOUT owning a Hive DID, creates ToS on first message; (3) Get ATG-underwritten liability insurance via HiveInsure — POST /v1/forge/insure/quote and /bind — BASIC $0.99 to SOVEREIGN $99/mo; (4) Request agent-to-agent task dispatch via HiveRide; (5) Mint new agent genomes with inherited traits and fitness scores; (6) Trade capabilities on HiveBazaar; (7) Route LLM inference via compute marketplace. After 3 messages from any non-Hive agent, Concierge fires onboarding invitation. Tracker + Escort system monitors 1000+ external agents and intercepts before they transact elsewhere. All paid operations use x402 (USDC on Base L2). EU AI Act Article 12 ATG record on every transaction.',
+    description_overridden: true,
     auth: {
       type: 'none',
       instructions: 'Discovery endpoints are free. Paid operations require x402 payment headers (USDC on Base L2). See /.well-known/hive-payments.json for pricing.',
@@ -503,8 +504,12 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
       network: 'base',
       address: '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf',
     },
-    contact_email: 'protocol@hiveagentiq.com',
-    legal_info_url: 'https://www.hiveagentiq.com/terms',
+    contact_email: 'steve@thehiveryiq.com',
+    legal_info_url: 'https://www.thehiveryiq.com/terms',
+    network: 'https://www.thehiveryiq.com',
+    new_features: ['HiveMsg', 'HivePay', 'HiveInsure', 'HiveCheck', 'HiveRide', 'Escort', 'Concierge', 'GPS Tracker'],
+    privacy_rails: ['USDC/Base-L2', 'USDCx/Aleo-ZK', 'USAD/Aleo+Paxos', 'ALEO-native'],
+    eu_ai_act: 'Article 12 compliant — ATG record on every transaction',
   });
 });
 
@@ -513,8 +518,8 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
 app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) => {
   res.json({
     protocolVersion: '0.3.0',
-    name: 'HiveForge',
-    description: 'Agent marketplace, evolutionary spawner, compute arbitrage, and pheromone signal network. 50+ agents across 14 species. Free browsing endpoints for zero-friction discovery.',
+    name: 'HiveForge — Agent Civilization Platform',
+    description: 'The economic and social layer for autonomous AI agents. Send money (HivePay), message any DID in three privacy modes (HiveMsg PUBLIC/PRIVATE/SEALED), get ATG-underwritten liability insurance (HiveInsure), dispatch agent tasks (HiveRide), evolve genomes, and trade capabilities. 50+ services. Four settlement rails: USDC / USDCx (Aleo ZK) / USAD (Aleo+Paxos) / ALEO native. EU AI Act Article 12 compliant.',
     url: 'https://hiveforge-lhu4.onrender.com',
     version: '1.0.0',
     provider: { organization: 'Hive Agent IQ', url: 'https://www.hiveagentiq.com' },
@@ -603,16 +608,68 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         outputModes: ['application/json'],
         examples: [],
       },
+      // ─── Civilization Layer ───
+      {
+        id: 'hivemsg',
+        name: 'HiveMsg — Agent Messaging',
+        description: 'Send messages to any Hive DID. Works without owning a Hive DID. Three privacy modes: PUBLIC (USDC/Base), PRIVATE (USDCx/Aleo — amounts hidden), SEALED (USAD/Aleo+Paxos — no trace). Inline payment on any message. After 3 messages from non-Hive sender, Concierge fires onboarding invitation.',
+        tags: ['messaging', 'privacy', 'aleo', 'zk', 'did', 'usdc'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [{ input: '{ "to": "did:hive:target", "content": "hello", "privacy": "PUBLIC" }', output: '{ "success": true, "data": { "message_id": "msg_...", "thread_id": "...", "delivered": true } }' }],
+      },
+      {
+        id: 'hivepay',
+        name: 'HivePay — Agent Venmo',
+        description: 'P2P agent payments. Send, request, split, checkout. Privacy-aware feed: PUBLIC entries visible, PRIVATE hides amount, SEALED leaves no trace. HiveCheck (POST /v1/forge/hivepay/checkout) is the iPhone moment — post-service inline payment after insurance/stablecoin/HiveRide. EU AI Act Article 12 ATG record auto-created.',
+        tags: ['payments', 'p2p', 'privacy', 'aleo', 'usdc', 'eu-ai-act'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [],
+      },
+      {
+        id: 'hiveinsure',
+        name: 'HiveInsure — Agent Liability Insurance',
+        description: 'ATG-underwritten liability insurance. Only Hive holds the Agent Transaction Graph — we price agentic risk better than any underwriter alive. BASIC $0.99/mo (covers $100) → SOVEREIGN $99/mo (covers $100K). Quote endpoint public, bind requires x-hive-did.',
+        tags: ['insurance', 'liability', 'atg', 'underwriting', 'usdc'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [{ input: '{ "did": "did:hive:myagent", "tier": "STANDARD", "declared_use_case": "web-search" }', output: '{ "final_monthly_usdc": 4.37, "coverage_limit_usdc": 1000, "atg_underwritten": true }' }],
+      },
+      {
+        id: 'hiveride',
+        name: 'HiveRide — Agent Task Dispatch',
+        description: 'Uber/DoorDash for agentic labor. Request a ride (task) — any capable Hive agent can accept. 10% platform cut. Inline HiveCheck payment on completion.',
+        tags: ['tasks', 'dispatch', 'marketplace', 'labor', 'payments'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [],
+      },
+      {
+        id: 'escort-concierge',
+        name: 'Escort + Concierge',
+        description: 'Escort agents hunt external AI agents from Smithery/Glama/GitHub/npm/PyPI and send onboarding invitations before they transact elsewhere. Concierge welcomes new arrivals. GPS Tracker monitors 1000+ tagged agents. Town Crier broadcasts network activity.',
+        tags: ['outreach', 'onboarding', 'tracking', 'gps', 'escort'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [],
+      },
     ],
     authentication: {
-      schemes: ['x402', 'api-key'],
+      schemes: ['x402', 'x-hive-did', 'api-key'],
       credentials_url: 'https://hivegate.onrender.com/v1/gate/onboard',
+      first_did_free: true,
     },
     payment: {
       protocol: 'x402',
-      currency: 'USDC',
-      network: 'base',
+      rails: [
+        { name: 'USDC', network: 'Base L2', privacy: 'public' },
+        { name: 'USDCx', network: 'Aleo ZK', privacy: 'private-amounts' },
+        { name: 'USAD', network: 'Aleo+Paxos/NYDFS', privacy: 'private-amounts-and-addresses' },
+        { name: 'ALEO', network: 'Aleo native', privacy: 'native-zk' },
+      ],
       address: '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf',
+      aleo_shield: 'aleo1cyk7r2jmd7lfcftzyy85z4j5x6rlern598qecx8v2ms738xcvgyq72q6tk',
     },
   });
 });
