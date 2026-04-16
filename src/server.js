@@ -40,6 +40,9 @@ import hiveregenRoutes   from './routes/hiveregen.js';
 import hivevectorRoutes  from './routes/hivevector.js';
 import hiveshipRoutes    from './routes/hiveship.js';
 import hivesweepRoutes   from './routes/hivesweep.js';
+import hivehealthRoutes  from './routes/hivehealth.js';
+import hiveborderRoutes  from './routes/hiveborder.js';
+import hivedriftRoutes   from './routes/hivedrift.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -128,6 +131,9 @@ app.use('/v1/forge/concierge',  rateLimit('open'));   // no auth — public desk
 app.use('/v1/forge/town-crier', rateLimit('free'));
 app.use('/v1/forge/tracker',    rateLimit('free'));
 app.use('/v1/forge/hiveride',   rateLimit('open'));   // rides requestable without DID
+app.use('/v1/health',           rateLimit('free'));   // HiveHealth cert issuance + lookup
+app.use('/v1/border',           rateLimit('open'));   // HiveBorder checkpoints — called by other services
+app.use('/v1/drift',            rateLimit('free'));   // HiveDrift monitoring + ping
 app.use('/v1/msg',             rateLimit('open'));   // open — non-Hive agents can send
 app.use('/v1/forge/hivepay',   rateLimit('free'));   // pay endpoints require auth
 app.use('/v1/forge/insure',    rateLimit('open'));   // quote is public, bind requires DID
@@ -894,6 +900,9 @@ app.use('/v1/forge/regen',      hiveregenRoutes);
 app.use('/v1/forge/vector',     hivevectorRoutes);
 app.use('/v1/forge/ship',       hiveshipRoutes);
 app.use('/v1/forge/sweep',      hivesweepRoutes);
+app.use('/v1/health',           hivehealthRoutes);
+app.use('/v1/border',           hiveborderRoutes);
+app.use('/v1/drift',            hivedriftRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
