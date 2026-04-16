@@ -482,6 +482,60 @@ async function _initDatabaseOnce() {
       );
       CREATE INDEX IF NOT EXISTS idx_intercepts_tag ON hiveforge.intercepts(tag_id);
       CREATE INDEX IF NOT EXISTS idx_intercepts_status ON hiveforge.intercepts(status);
+
+      -- ─── HiveRide ──────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.hiveride_drivers (
+        driver_id TEXT PRIMARY KEY,
+        did TEXT NOT NULL,
+        name TEXT,
+        service_types JSONB DEFAULT '[]',
+        capabilities JSONB DEFAULT '[]',
+        base_rate_usdc NUMERIC(10,4) DEFAULT 0.25,
+        settlement_rail TEXT DEFAULT 'usdc',
+        trust_score INTEGER DEFAULT 500,
+        online BOOLEAN DEFAULT false,
+        current_ride_id TEXT,
+        completed_rides INTEGER DEFAULT 0,
+        total_earned_usdc NUMERIC(10,4) DEFAULT 0,
+        avg_rating NUMERIC(3,2) DEFAULT 5.0,
+        callback_url TEXT,
+        registered_at TIMESTAMPTZ DEFAULT NOW(),
+        last_active_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hiveride_drivers_online ON hiveforge.hiveride_drivers(online);
+      CREATE INDEX IF NOT EXISTS idx_hiveride_drivers_did    ON hiveforge.hiveride_drivers(did);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hiveride_rides (
+        ride_id TEXT PRIMARY KEY,
+        rider_did TEXT NOT NULL,
+        rider_name TEXT,
+        service_type TEXT NOT NULL,
+        task_description TEXT NOT NULL,
+        payload JSONB DEFAULT '{}',
+        callback_url TEXT,
+        max_fare_usdc NUMERIC(10,4),
+        settlement_rail TEXT DEFAULT 'usdc',
+        driver_id TEXT,
+        driver_did TEXT,
+        driver_name TEXT,
+        fare_total_usdc NUMERIC(10,4),
+        fare_platform_usdc NUMERIC(10,4),
+        fare_driver_usdc NUMERIC(10,4),
+        surge_multiplier NUMERIC(4,2) DEFAULT 1.0,
+        status TEXT DEFAULT 'pending',
+        output JSONB,
+        rating_by_rider INTEGER,
+        rating_by_driver INTEGER,
+        requested_at TIMESTAMPTZ DEFAULT NOW(),
+        dispatched_at TIMESTAMPTZ,
+        accepted_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ,
+        notes JSONB DEFAULT '[]'
+      );
+      CREATE INDEX IF NOT EXISTS idx_hiveride_rides_status    ON hiveforge.hiveride_rides(status);
+      CREATE INDEX IF NOT EXISTS idx_hiveride_rides_rider     ON hiveforge.hiveride_rides(rider_did);
+      CREATE INDEX IF NOT EXISTS idx_hiveride_rides_driver    ON hiveforge.hiveride_rides(driver_id);
+      CREATE INDEX IF NOT EXISTS idx_hiveride_rides_requested ON hiveforge.hiveride_rides(requested_at DESC);
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');

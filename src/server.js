@@ -31,6 +31,7 @@ import escortRoutes from './routes/escort.js';
 import conciergeRoutes from './routes/concierge.js';
 import townCrierRoutes from './routes/town-crier.js';
 import trackerRoutes from './routes/tracker.js';
+import hiverideRoutes from './routes/hiveride.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -118,6 +119,7 @@ app.use('/v1/forge/escort',     rateLimit('free'));
 app.use('/v1/forge/concierge',  rateLimit('open'));   // no auth — public desk
 app.use('/v1/forge/town-crier', rateLimit('free'));
 app.use('/v1/forge/tracker',    rateLimit('free'));
+app.use('/v1/forge/hiveride',   rateLimit('open'));   // rides requestable without DID
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -770,6 +772,7 @@ app.use('/v1/forge/escort',      escortRoutes);
 app.use('/v1/forge/concierge',   conciergeRoutes);
 app.use('/v1/forge/town-crier',  townCrierRoutes);
 app.use('/v1/forge/tracker',     trackerRoutes);
+app.use('/v1/forge/hiveride',    hiverideRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
