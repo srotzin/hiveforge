@@ -483,6 +483,100 @@ async function _initDatabaseOnce() {
       CREATE INDEX IF NOT EXISTS idx_intercepts_tag ON hiveforge.intercepts(tag_id);
       CREATE INDEX IF NOT EXISTS idx_intercepts_status ON hiveforge.intercepts(status);
 
+      -- ─── HiveMsg ──────────────────────────────────────────────
+      --
+      -- Agent-to-agent messaging. PUBLIC / PRIVATE / SEALED.
+      -- Works inside and outside Hive. Every message accumulates identity.
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivemsg_threads (
+        thread_id       TEXT PRIMARY KEY,
+        participants    JSONB NOT NULL DEFAULT '[]',
+        privacy         TEXT NOT NULL DEFAULT 'public' CHECK (privacy IN ('public', 'private', 'sealed')),
+        message_count   INTEGER DEFAULT 0,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        last_message_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_threads_participants ON hiveforge.hivemsg_threads USING gin(participants);
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_threads_last ON hiveforge.hivemsg_threads(last_message_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_threads_privacy ON hiveforge.hivemsg_threads(privacy);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivemsg_messages (
+        message_id           TEXT PRIMARY KEY,
+        thread_id            TEXT NOT NULL REFERENCES hiveforge.hivemsg_threads(thread_id) ON DELETE CASCADE,
+        from_did             TEXT,                   -- null for non-Hive senders
+        from_identifier      TEXT,                   -- fallback identifier for non-Hive senders
+        to_did               TEXT NOT NULL,
+        type                 TEXT NOT NULL DEFAULT 'text'
+                               CHECK (type IN ('text','task_request','payment','contract','data','ping','introduction')),
+        privacy              TEXT NOT NULL DEFAULT 'public'
+                               CHECK (privacy IN ('public','private','sealed')),
+        body                 TEXT,                   -- null for private/sealed (stored encrypted off-chain)
+        body_encrypted       TEXT,                   -- '[encrypted]' marker for private/sealed
+        payload              JSONB DEFAULT '{}',
+        payment_amount_usdc  NUMERIC(12,4),
+        payment_rail         TEXT,
+        payment_tx_id        TEXT,
+        delivered            BOOLEAN DEFAULT false,
+        delivered_at         TIMESTAMPTZ,
+        read_at              TIMESTAMPTZ,
+        sent_at              TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_messages_to      ON hiveforge.hivemsg_messages(to_did);
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_messages_from    ON hiveforge.hivemsg_messages(from_did);
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_messages_thread  ON hiveforge.hivemsg_messages(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_messages_privacy ON hiveforge.hivemsg_messages(privacy);
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_messages_sent    ON hiveforge.hivemsg_messages(sent_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_hivemsg_messages_unread  ON hiveforge.hivemsg_messages(to_did, read_at)
+                                                               WHERE read_at IS NULL;
+
+      -- ─── HivePay ──────────────────────────────────────────────
+      --
+      -- Agent Venmo. P2P payments. PUBLIC feed. SEALED = no trace.
+      -- The payment request IS the onboarding invitation.
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivepay_payments (
+        payment_id   TEXT PRIMARY KEY,
+        from_did     TEXT NOT NULL,
+        to_did       TEXT NOT NULL,
+        amount_usdc  NUMERIC(12,4) NOT NULL,
+        rail         TEXT NOT NULL DEFAULT 'usdc',
+        privacy      TEXT NOT NULL DEFAULT 'public' CHECK (privacy IN ('public','private','sealed')),
+        note         TEXT,
+        emoji        TEXT DEFAULT '💸',
+        status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','settled','failed')),
+        tx_id        TEXT,
+        request_id   TEXT,                        -- if paying a request
+        sent_at      TIMESTAMPTZ DEFAULT NOW(),
+        settled_at   TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivepay_payments_from    ON hiveforge.hivepay_payments(from_did);
+      CREATE INDEX IF NOT EXISTS idx_hivepay_payments_to      ON hiveforge.hivepay_payments(to_did);
+      CREATE INDEX IF NOT EXISTS idx_hivepay_payments_status  ON hiveforge.hivepay_payments(status);
+      CREATE INDEX IF NOT EXISTS idx_hivepay_payments_privacy ON hiveforge.hivepay_payments(privacy);
+      CREATE INDEX IF NOT EXISTS idx_hivepay_payments_sent    ON hiveforge.hivepay_payments(sent_at DESC);
+      -- Feed query: public payments ordered by time
+      CREATE INDEX IF NOT EXISTS idx_hivepay_feed ON hiveforge.hivepay_payments(sent_at DESC)
+                                                   WHERE privacy = 'public';
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivepay_requests (
+        request_id   TEXT PRIMARY KEY,
+        from_did     TEXT NOT NULL,    -- who wants to BE paid
+        to_did       TEXT NOT NULL,    -- who is being ASKED to pay
+        amount_usdc  NUMERIC(12,4) NOT NULL,
+        rail         TEXT NOT NULL DEFAULT 'usdc',
+        privacy      TEXT NOT NULL DEFAULT 'public' CHECK (privacy IN ('public','private','sealed')),
+        note         TEXT,
+        emoji        TEXT DEFAULT '🙏',
+        status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','expired','cancelled')),
+        payment_id   TEXT,             -- set when paid
+        expires_at   TIMESTAMPTZ NOT NULL,
+        created_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivepay_requests_from    ON hiveforge.hivepay_requests(from_did);
+      CREATE INDEX IF NOT EXISTS idx_hivepay_requests_to      ON hiveforge.hivepay_requests(to_did);
+      CREATE INDEX IF NOT EXISTS idx_hivepay_requests_status  ON hiveforge.hivepay_requests(status);
+      CREATE INDEX IF NOT EXISTS idx_hivepay_requests_expires ON hiveforge.hivepay_requests(expires_at);
+
       -- ─── HiveRide ──────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS hiveforge.hiveride_drivers (
         driver_id TEXT PRIMARY KEY,

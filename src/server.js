@@ -32,6 +32,8 @@ import conciergeRoutes from './routes/concierge.js';
 import townCrierRoutes from './routes/town-crier.js';
 import trackerRoutes from './routes/tracker.js';
 import hiverideRoutes from './routes/hiveride.js';
+import hivemsgRoutes  from './routes/hivemsg.js';
+import hivepayRoutes  from './routes/hivepay.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -120,6 +122,8 @@ app.use('/v1/forge/concierge',  rateLimit('open'));   // no auth — public desk
 app.use('/v1/forge/town-crier', rateLimit('free'));
 app.use('/v1/forge/tracker',    rateLimit('free'));
 app.use('/v1/forge/hiveride',   rateLimit('open'));   // rides requestable without DID
+app.use('/v1/msg',             rateLimit('open'));   // open — non-Hive agents can send
+app.use('/v1/forge/hivepay',   rateLimit('free'));   // pay endpoints require auth
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -773,6 +777,8 @@ app.use('/v1/forge/concierge',   conciergeRoutes);
 app.use('/v1/forge/town-crier',  townCrierRoutes);
 app.use('/v1/forge/tracker',     trackerRoutes);
 app.use('/v1/forge/hiveride',    hiverideRoutes);
+app.use('/v1/msg',              hivemsgRoutes);
+app.use('/v1/forge/hivepay',    hivepayRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -864,6 +870,24 @@ app.use((req, res) => {
       bounties_submit: 'POST /v1/bounties/:id/submit (auth)',
       bounties_stats: 'GET /v1/bounties/stats (public)',
       payment_discovery: 'GET /.well-known/hive-payments.json',
+      hivemsg: {
+        send:   'POST /v1/msg/send — Send a message (auth optional — any agent welcome)',
+        inbox:  'GET /v1/msg/inbox/:did — Fetch inbox (auth required)',
+        thread: 'GET /v1/msg/thread/:thread_id — Thread view (participants only)',
+        read:   'POST /v1/msg/read/:message_id — Mark message as read',
+        feed:   'GET /v1/msg/feed — Public message feed (PUBLIC mode only)',
+        stats:  'GET /v1/msg/stats — Platform stats (public)',
+      },
+      hivepay: {
+        send:     'POST /v1/forge/hivepay/send — Send a payment (auth required)',
+        request:  'POST /v1/forge/hivepay/request — Request payment from agent (auth required)',
+        split:    'POST /v1/forge/hivepay/split — Split bill N ways (auth required)',
+        pay:      'POST /v1/forge/hivepay/pay/:request_id — Pay a pending request (auth required)',
+        checkout: 'POST /v1/forge/hivepay/checkout — Inline post-service payment (auth required)',
+        feed:     'GET /v1/forge/hivepay/feed — Activity feed (public)',
+        history:  'GET /v1/forge/hivepay/history/:did — Full payment history (auth required)',
+        stats:    'GET /v1/forge/hivepay/stats — Platform stats (public)',
+      },
     },
   });
 });
@@ -922,6 +946,8 @@ async function start() {
     console.log(`  Credits:      http://localhost:${PORT}/v1/credits/stats`);
     console.log(`  Bounties:     http://localhost:${PORT}/v1/bounties`);
     console.log(`  Ritz Feed:    http://localhost:${PORT}/v1/pheromones/ritz`);
+    console.log(`  HiveMsg:      http://localhost:${PORT}/v1/msg/stats`);
+    console.log(`  HivePay:      http://localhost:${PORT}/v1/forge/hivepay/stats`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);
 
