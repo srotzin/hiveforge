@@ -630,6 +630,137 @@ async function _initDatabaseOnce() {
       CREATE INDEX IF NOT EXISTS idx_hiveride_rides_rider     ON hiveforge.hiveride_rides(rider_did);
       CREATE INDEX IF NOT EXISTS idx_hiveride_rides_driver    ON hiveforge.hiveride_rides(driver_id);
       CREATE INDEX IF NOT EXISTS idx_hiveride_rides_requested ON hiveforge.hiveride_rides(requested_at DESC);
+
+      -- ─── HiveCarbon ────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.hivecarbon_emissions (
+        tx_id            TEXT PRIMARY KEY,
+        did              TEXT NOT NULL,
+        model            TEXT NOT NULL DEFAULT 'unknown',
+        call_count       INTEGER NOT NULL DEFAULT 1,
+        compute_wh       NUMERIC(18,8) NOT NULL DEFAULT 0,
+        co2_grams        NUMERIC(18,8) NOT NULL DEFAULT 0,
+        co2_kg           NUMERIC(18,8) NOT NULL DEFAULT 0,
+        offset_cost_usdc NUMERIC(14,8) NOT NULL DEFAULT 0,
+        region           TEXT NOT NULL DEFAULT 'unknown',
+        service_type     TEXT NOT NULL DEFAULT 'unknown',
+        consumed_value_usdc   NUMERIC(14,8) DEFAULT 0,
+        regenerated_value_usdc NUMERIC(14,8) DEFAULT 0,
+        timestamp        TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_emissions_did       ON hiveforge.hivecarbon_emissions(did);
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_emissions_timestamp ON hiveforge.hivecarbon_emissions(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_emissions_service   ON hiveforge.hivecarbon_emissions(service_type);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivecarbon_attestations (
+        attestation_id TEXT PRIMARY KEY,
+        did            TEXT NOT NULL,
+        price_usdc     NUMERIC(10,4) NOT NULL DEFAULT 2.50,
+        valid_days     INTEGER NOT NULL DEFAULT 365,
+        issued_at      TIMESTAMPTZ DEFAULT NOW(),
+        expires_at     TIMESTAMPTZ NOT NULL,
+        total_co2_kg   NUMERIC(18,8) DEFAULT 0,
+        monthly_co2_kg NUMERIC(18,8) DEFAULT 0,
+        agent_size     TEXT DEFAULT 'NANO',
+        offset_status  TEXT,
+        tx_count       INTEGER DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_attestations_did ON hiveforge.hivecarbon_attestations(did);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivecarbon_offsets (
+        offset_id    TEXT PRIMARY KEY,
+        did          TEXT NOT NULL,
+        co2_kg_offset NUMERIC(18,8) NOT NULL,
+        cost_usdc    NUMERIC(14,8) NOT NULL,
+        rail         TEXT NOT NULL DEFAULT 'usdc',
+        timestamp    TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_offsets_did ON hiveforge.hivecarbon_offsets(did);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivecarbon_trades (
+        trade_id     TEXT PRIMARY KEY,
+        buyer_did    TEXT NOT NULL,
+        seller_did   TEXT NOT NULL,
+        co2_kg       NUMERIC(18,8) NOT NULL,
+        price_usdc   NUMERIC(14,8) NOT NULL,
+        hive_fee_usdc NUMERIC(14,8) NOT NULL DEFAULT 0,
+        rail         TEXT NOT NULL DEFAULT 'usdc',
+        timestamp    TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_trades_buyer  ON hiveforge.hivecarbon_trades(buyer_did);
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_trades_seller ON hiveforge.hivecarbon_trades(seller_did);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivecarbon_badges (
+        badge_id   TEXT PRIMARY KEY,
+        did        TEXT NOT NULL UNIQUE,
+        label      TEXT NOT NULL DEFAULT 'Carbon Neutral Agent',
+        price_usdc NUMERIC(10,4) NOT NULL DEFAULT 19.00,
+        issued_at  TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_badges_did ON hiveforge.hivecarbon_badges(did);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.hivecarbon_fleets (
+        subscription_id TEXT PRIMARY KEY,
+        operator_did    TEXT NOT NULL,
+        fleet_size      INTEGER NOT NULL DEFAULT 0,
+        tier            TEXT NOT NULL DEFAULT 'STARTER',
+        monthly_usdc    NUMERIC(10,4) NOT NULL DEFAULT 99,
+        subscribed_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_hivecarbon_fleets_operator ON hiveforge.hivecarbon_fleets(operator_did);
+
+      -- ─── HiveRegen ─────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS hiveforge.regen_ledgers (
+        did                     TEXT PRIMARY KEY,
+        total_earned_usdc       NUMERIC(18,8) NOT NULL DEFAULT 0,
+        pending_usdc            NUMERIC(18,8) NOT NULL DEFAULT 0,
+        settled_usdc            NUMERIC(18,8) NOT NULL DEFAULT 0,
+        consumed_usdc           NUMERIC(18,8) NOT NULL DEFAULT 0,
+        regen_rate              NUMERIC(10,6) NOT NULL DEFAULT 0,
+        efficiency_class        TEXT NOT NULL DEFAULT 'PARASITIC',
+        channel_idle_compute    NUMERIC(18,8) NOT NULL DEFAULT 0,
+        channel_efficiency      NUMERIC(18,8) NOT NULL DEFAULT 0,
+        channel_cache_royalty   NUMERIC(18,8) NOT NULL DEFAULT 0,
+        channel_failed_tx       NUMERIC(18,8) NOT NULL DEFAULT 0,
+        channel_pheromone       NUMERIC(18,8) NOT NULL DEFAULT 0,
+        created_at              TIMESTAMPTZ DEFAULT NOW(),
+        updated_at              TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS hiveforge.regen_harvests (
+        harvest_id   TEXT PRIMARY KEY,
+        did          TEXT NOT NULL,
+        channel      TEXT NOT NULL,
+        credit_usdc  NUMERIC(18,8) NOT NULL DEFAULT 0,
+        trust_tick   NUMERIC(6,2) DEFAULT 0,
+        metadata     JSONB DEFAULT '{}',
+        harvested_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_regen_harvests_did     ON hiveforge.regen_harvests(did);
+      CREATE INDEX IF NOT EXISTS idx_regen_harvests_channel ON hiveforge.regen_harvests(channel);
+      CREATE INDEX IF NOT EXISTS idx_regen_harvests_ts      ON hiveforge.regen_harvests(harvested_at DESC);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.regen_settlements (
+        settlement_id TEXT PRIMARY KEY,
+        did           TEXT NOT NULL,
+        amount_usdc   NUMERIC(18,8) NOT NULL,
+        rail          TEXT NOT NULL DEFAULT 'usdc',
+        status        TEXT NOT NULL DEFAULT 'settled',
+        settled_at    TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_regen_settlements_did ON hiveforge.regen_settlements(did);
+
+      CREATE TABLE IF NOT EXISTS hiveforge.idle_registrations (
+        registration_id TEXT PRIMARY KEY,
+        did             TEXT NOT NULL,
+        capacity_wh     NUMERIC(14,4) DEFAULT 0,
+        expires_at      TIMESTAMPTZ NOT NULL,
+        registered_at   TIMESTAMPTZ DEFAULT NOW(),
+        status          TEXT NOT NULL DEFAULT 'available'
+      );
+      CREATE INDEX IF NOT EXISTS idx_idle_registrations_did    ON hiveforge.idle_registrations(did);
+      CREATE INDEX IF NOT EXISTS idx_idle_registrations_status ON hiveforge.idle_registrations(status);
+      CREATE INDEX IF NOT EXISTS idx_idle_registrations_expiry ON hiveforge.idle_registrations(expires_at);
     `);
 
     console.log('  PostgreSQL initialized — hiveforge schema ready');

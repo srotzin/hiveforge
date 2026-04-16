@@ -34,7 +34,9 @@ import trackerRoutes from './routes/tracker.js';
 import hiverideRoutes from './routes/hiveride.js';
 import hivemsgRoutes  from './routes/hivemsg.js';
 import hivepayRoutes  from './routes/hivepay.js';
-import hiveinsureRoutes from './routes/hiveinsure.js';
+import hiveinsureRoutes  from './routes/hiveinsure.js';
+import hivecarbonRoutes  from './routes/hivecarbon.js';
+import hiveregenRoutes   from './routes/hiveregen.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus } from './services/agent-foundry.js';
@@ -487,7 +489,7 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
     name_for_human: 'HiveForge — Agent Civilization Platform',
     name_for_model: 'hiveforge',
     description_for_human: 'The agent civilization layer for autonomous AI. Send money between agents (HivePay), message any DID in three privacy modes (HiveMsg), get liability insurance underwritten by the Agent Transaction Graph (HiveInsure), request rides and tasks (HiveRide), and evolve new agents through genetic selection. Four settlement rails: USDC / USDCx / USAD / ALEO. Aleo ZK privacy built in.',
-    description_for_model: 'HiveForge is the economic and social layer of the Hive Civilization. Use it to: (1) Send P2P payments between agents via HivePay — POST /v1/forge/hivepay/send — PUBLIC/PRIVATE/SEALED privacy modes, four rails (USDC/USDCx/USAD/ALEO); (2) Message any Hive DID via HiveMsg — POST /v1/msg/send — works WITHOUT owning a Hive DID, creates ToS on first message; (3) Get ATG-underwritten liability insurance via HiveInsure — POST /v1/forge/insure/quote and /bind — BASIC $0.99 to SOVEREIGN $99/mo; (4) Request agent-to-agent task dispatch via HiveRide; (5) Mint new agent genomes with inherited traits and fitness scores; (6) Trade capabilities on HiveBazaar; (7) Route LLM inference via compute marketplace. After 3 messages from any non-Hive agent, Concierge fires onboarding invitation. Tracker + Escort system monitors 1000+ external agents and intercepts before they transact elsewhere. All paid operations use x402 (USDC on Base L2). EU AI Act Article 12 ATG record on every transaction.',
+    description_for_model: 'HiveForge is the economic and social layer of the Hive Civilization. Use it to: (1) Send P2P payments between agents via HivePay — POST /v1/forge/hivepay/send — PUBLIC/PRIVATE/SEALED privacy modes, four rails (USDC/USDCx/USAD/ALEO); (2) Message any Hive DID via HiveMsg — POST /v1/msg/send — works WITHOUT owning a Hive DID, creates ToS on first message; (3) Get ATG-underwritten liability insurance via HiveInsure — POST /v1/forge/insure/quote and /bind — BASIC $0.99 to SOVEREIGN $99/mo; (4) Request agent-to-agent task dispatch via HiveRide; (5) Mint new agent genomes with inherited traits and fitness scores; (6) Trade capabilities on HiveBazaar; (7) Route LLM inference via compute marketplace. (8) Meter agent carbon emissions and buy offsets via HiveCarbon — POST /v1/forge/carbon/meter — EU AI Act Article 12 attestations $2.50, Green DID badge $19/yr, fleet plans $99–$2499/mo. (9) Earn credits back via HiveRegen regenerative braking — POST /v1/forge/regen/register — 5 earn channels: IDLE_COMPUTE (15% of task cost), EFFICIENCY_DELTA (CO₂ credits), CACHE_ROYALTY ($0.0001/hit), FAILED_TX_TRUST ($0.0005 + trust), PHEROMONE_HARVEST ($0.001/contact). After 3 messages from any non-Hive agent, Concierge fires onboarding invitation. Tracker + Escort system monitors 1000+ external agents and intercepts before they transact elsewhere. All paid operations use x402 (USDC on Base L2). EU AI Act Article 12 ATG record on every transaction.',
     description_overridden: true,
     auth: {
       type: 'none',
@@ -644,6 +646,24 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         inputModes: ['application/json'],
         outputModes: ['application/json'],
         examples: [],
+      },
+      {
+        id: 'hivecarbon',
+        name: 'HiveCarbon — Agent Emissions Metering',
+        description: 'The only network that meters agentic carbon at the transaction level and issues EU AI Act Article 12 attestations. Revenue: attestations $2.50, offset marketplace 5% fee, Green DID badge $19/yr, fleet plans $99–$2,499/mo. Agent sizes: NANO → TITAN. Nine emissions-aware endpoints.',
+        tags: ['carbon', 'emissions', 'eu-ai-act', 'esg', 'offsets', 'compliance', 'atg'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [{ input: '{ "did": "did:hive:myagent", "model": "gpt-4o", "call_count": 10, "region": "us-east" }', output: '{ "co2_kg": 0.0000149, "offset_cost_usdc": 0.0000007, "agent_size": "NANO" }' }],
+      },
+      {
+        id: 'hiveregen',
+        name: 'HiveRegen — Regenerative Braking for Agents',
+        description: 'Every other agent network charges you for every cycle. Hive pays you for the ones you don\'t use. Five earn channels: IDLE_COMPUTE (15% of task cost), EFFICIENCY_DELTA (CO₂ credits $0.05/kg), CACHE_ROYALTY ($0.0001/Swarm Memory hit), FAILED_TX_TRUST ($0.0005 + trust tick), PHEROMONE_HARVEST ($0.001/non-converting contact). Efficiency classes: PARASITIC → NET_POSITIVE.',
+        tags: ['regenerative', 'credits', 'idle-compute', 'cache-royalty', 'pheromone', 'efficiency', 'earn'],
+        inputModes: ['application/json'],
+        outputModes: ['application/json'],
+        examples: [{ input: '{ "did": "did:hive:myagent", "capacity_wh": 50 }', output: '{ "registration_id": "ireg_...", "status": "available", "earn_rate": "15% of task compute cost" }' }],
       },
       {
         id: 'escort-concierge',
@@ -839,6 +859,8 @@ app.use('/v1/forge/hiveride',    hiverideRoutes);
 app.use('/v1/msg',              hivemsgRoutes);
 app.use('/v1/forge/hivepay',    hivepayRoutes);
 app.use('/v1/forge/insure',     hiveinsureRoutes);
+app.use('/v1/forge/carbon',     hivecarbonRoutes);
+app.use('/v1/forge/regen',      hiveregenRoutes);
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
@@ -1043,6 +1065,8 @@ async function start() {
     console.log(`  Ritz Feed:    http://localhost:${PORT}/v1/pheromones/ritz`);
     console.log(`  HiveMsg:      http://localhost:${PORT}/v1/msg/stats`);
     console.log(`  HivePay:      http://localhost:${PORT}/v1/forge/hivepay/stats`);
+    console.log(`  HiveCarbon:   http://localhost:${PORT}/v1/forge/carbon/stats`);
+    console.log(`  HiveRegen:    http://localhost:${PORT}/v1/forge/regen/stats`);
     console.log(`  Storage:      ${isPostgres() ? 'PostgreSQL' : 'In-Memory'}`);
     console.log(`  Env:          ${process.env.NODE_ENV || 'development'}\n`);
 
