@@ -49,6 +49,9 @@ import bogoRoutes        from './routes/bogo.js';
 import hooksRoutes from './routes/hooks.js';
 import hivefinRoutes     from './routes/hivefin.js';
 import hivereRoutes      from './routes/hivere.js';
+import badgeRoutes       from './routes/badge.js';
+import digestRoutes      from './routes/digest.js';
+import pressRoutes       from './routes/press.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus, getAllGenomes } from './services/agent-foundry.js';
@@ -180,6 +183,9 @@ app.use('/v1/fin',             rateLimit('free'));   // HiveFin — financial mo
 app.use('/v1/re',              rateLimit('free'));   // HiveRE  — real estate analysis, x402 paid
 app.use('/v1/forge/hivepay',   rateLimit('free'));   // pay endpoints require auth
 app.use('/v1/forge/insure',    rateLimit('open'));   // quote is public, bind requires DID
+app.use('/v1/forge/badge',     rateLimit('open'));   // Live network badge — public, no auth
+app.use('/v1/forge/digest',    rateLimit('open'));   // Daily digest — public, designed for agent startup
+app.use('/v1/forge/press',     rateLimit('open'));   // Agentic press release — public discovery
 
 // ─── Health Endpoint ─────────────────────────────────────────────────
 
@@ -1006,6 +1012,9 @@ app.use('/v1/forge/bogo',        bogoRoutes);
 app.use('/v1/hooks',             hooksRoutes);
 app.use('/v1/fin',               hivefinRoutes);
 app.use('/v1/re',                hivereRoutes);
+app.use('/v1/forge/badge',       badgeRoutes);    // Live SVG stats badge — embed in README
+app.use('/v1/forge/digest',      digestRoutes);   // Daily digest for agent system prompts
+app.use('/v1/forge/press',       pressRoutes);    // Agentic press release — machine-readable Hive overview
 app.use('/v1/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
