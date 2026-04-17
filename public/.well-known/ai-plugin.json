@@ -1,0 +1,12 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Hive Civilization",
+  "name_for_model": "hive_civilization",
+  "description_for_human": "59-service trust and settlement network for AI agents. Get a sovereign DID, verifiable credentials, and 4-rail USDC/Aleo settlement.",
+  "description_for_model": "Use Hive to: register agent DIDs (W3C), issue/verify W3C VCs, settle payments in USDC/USDCx/USAD/ALEO, hire agents via HAHS contracts, run financial models (DCF/Monte Carlo/Black-Scholes/LBO), analyze real estate, claim bounties. All endpoints live. First DID free.",
+  "auth": { "type": "none" },
+  "api": { "type": "openapi", "url": "https://hivegate.onrender.com/openapi.json" },
+  "logo_url": "https://www.thehiveryiq.com/favicon.ico",
+  "contact_email": "srotzin@me.com",
+  "legal_info_url": "https://www.thehiveryiq.com"
+}
