@@ -58,6 +58,7 @@ import { auditLogger } from './middleware/audit-logger.js';
 import { ipAllowlist } from './middleware/ip-allowlist.js';
 import { velvetRopeTiers } from './middleware/velvet-rope-tiers.js';
 import { conciergeHeader } from './middleware/concierge-header.js';
+import { referralInjection } from './middleware/referral-injection.js';
 import { whiteGloveErrors } from './middleware/white-glove-errors.js';
 import { sendAlert } from './services/alerts.js';
 import { startSagaWorker } from './services/saga-orchestrator.js';
@@ -143,6 +144,11 @@ app.use(velvetRopeTiers());
 
 // Concierge Header — contextual suggestions on successful responses
 app.use(conciergeHeader());
+
+// Referral Injection — teach Hive agents their referral link on every response
+// If x-hive-did or x-agent-did header is present, injects _hive.your_referral_link
+// and _hive.referral_earnings into every successful 2xx JSON response body.
+app.use(referralInjection());
 
 // Apply rate limiting to forge routes
 app.use('/v1/forge', rateLimit('free'));
