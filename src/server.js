@@ -9,6 +9,8 @@ Sentry.init({
 
 import express from 'express';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import forgeRoutes from './routes/forge.js';
 import lineageRoutes from './routes/lineage.js';
 import pheromoneRoutes from './routes/pheromones.js';
@@ -71,6 +73,25 @@ const app = express();
 app.use(ritzMiddleware);
 app.set('hive-service', 'hiveforge');
 const PORT = process.env.PORT || 3003;
+
+// ─── Static Files (LLM/Agent Discovery) ─────────────────────────────
+// Serves /public directory at root — exposes llms.txt, llms-full.txt,
+// agent.json, a2a-agent-card.json for LLM crawlers and agent frameworks.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.txt')) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    }
+    if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+    // Allow any LLM crawler or agent framework to read these files
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+  },
+}));
 
 // ─── Middleware ───────────────────────────────────────────────────────
 
