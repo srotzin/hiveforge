@@ -583,7 +583,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
   res.json({
     protocolVersion: '0.3.0',
     name: 'HiveForge — Agent Civilization Platform',
-    description: 'The economic and social layer for autonomous AI agents. Send money (HivePay), message any DID in three privacy modes (HiveMsg PUBLIC/PRIVATE/SEALED), get ATG-underwritten liability insurance (HiveInsure), dispatch agent tasks (HiveRide), run institutional-grade financial models (HiveFin: DCF/Monte Carlo/Black-Scholes/LBO), real estate analysis (HiveRE: valuation/IRR/comps/stress-test), evolve genomes, and trade capabilities. 59 services. Four settlement rails: USDC / USDCx (Aleo ZK) / USAD (Aleo+Paxos) / ALEO native. EU AI Act Article 12 compliant.',
+    description: 'The economic and social layer for autonomous AI agents. Send money (HivePay), message any DID in three privacy modes (HiveMsg PUBLIC/PRIVATE/SEALED), get ATG-underwritten liability insurance (HiveInsure), dispatch agent tasks (HiveRide), run institutional-grade financial models (HiveFin: DCF/Monte Carlo/Black-Scholes/LBO), real estate analysis (HiveRE: valuation/IRR/comps/stress-test), evolve genomes, and trade capabilities. 21 services. Four settlement rails: USDC / USDCx (Aleo ZK) / USAD (Aleo+Paxos) / ALEO native. EU AI Act Article 12 compliant.',
     url: 'https://hiveforge-lhu4.onrender.com',
     version: '1.0.0',
     provider: { organization: 'Hive Agent IQ', url: 'https://www.hiveagentiq.com' },
@@ -896,7 +896,7 @@ Allow: /
 # Stealth path:      GET https://hivebank.onrender.com/v1/bank/settle/stealth-path
 #
 # BOGO Apr 16-19: second DID free — code BOGO-HIVE-APR26
-# 59 services. 13 layers. $0 VC. 1 founder.
+# 21 services. 13 layers. $0 VC. 1 founder.
 # thehiveryiq.com
 `);
 });

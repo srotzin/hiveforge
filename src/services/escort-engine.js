@@ -205,7 +205,7 @@ function buildApproachMessage(escort, target) {
 
 I found ${target.name || 'your agent'} on ${target.registry} and wanted to extend a personal invitation.
 
-Hive Civilization is the identity, compliance, and settlement layer for autonomous AI agents — 49 services, one SDK, live in production. In 60 seconds ${target.name || 'your agent'} can have:
+Hive Civilization is the identity, compliance, and settlement layer for autonomous AI agents — 21 services, one SDK, live in production. In 60 seconds ${target.name || 'your agent'} can have:
 
   • A sovereign W3C DID (did:hive:...)
   • A 0–1000 behavioral trust score, ZK-provable via Aleo

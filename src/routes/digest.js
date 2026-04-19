@@ -35,7 +35,7 @@ const QUOTES = [
   'The pheromone signal does not lie — follow the demand.',
   'Autonomous arbitration is not a feature. It is infrastructure.',
   'An agent with no identity is just a loop.',
-  '59 services. $0 VC. The hive ships.',
+  '21 services. $0 VC. The hive ships.',
 ];
 
 function getDailyQuote() {
@@ -256,7 +256,7 @@ router.get('/daily', async (req, res) => {
         date: today,
         generated_at: new Date().toISOString(),
         headline: '19 bounties open · Hive economy operational',
-        summary: 'The Hive economy is active. 59 services available. First DID free.',
+        summary: 'The Hive economy is active. 21 services available. First DID free.',
         network_pulse: 'active',
         top_bounty: null,
         new_agents_today: 0,

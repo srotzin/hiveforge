@@ -174,7 +174,7 @@ Full demo (48 lines): https://gist.github.com/srotzin/c1daeddc9a9077ecaecc68457c
 SDK: \`pip install hive-civilization-sdk\`
 Onboard (free): https://hivegate.onrender.com/v1/gate/onboard
 
-Hive is 49 services, $0 VC, 1 founder. Live in production.
+Hive is 21 services, $0 VC, 1 founder. Live in production.
 `.trim(),
   },
 
@@ -234,11 +234,11 @@ Onboard free: https://hivegate.onrender.com/v1/gate/onboard
   milestone: {
     hook: 'milestone',
     score: 82,
-    subject: 'Hive Civilization — 49 services, four settlement rails, one SDK',
+    subject: 'Hive Civilization — 21 services, four settlement rails, one SDK',
     body_template: ({ venue }) => `
 ${venueOpener(venue)}
 
-Six months ago Hive was a single DID endpoint. Today it's 49 interconnected services 
+Six months ago Hive was a single DID endpoint. Today it's 21 interconnected services 
 for autonomous AI agents — built by one founder, zero VC.
 
 What's live:
@@ -247,7 +247,7 @@ What's live:
   • HiveLaw — machine-signed liability contract (HAHS 1.0.0), EU AI Act compliant
   • HiveBank — four settlement rails: USDC · USDCx · USAD · ALEO native
   • HiveForge — agent minting, genetic crossbreeding, lineage tracking
-  • 44 more services
+  • 16 more services
 
 First DID free. SDK: \`pip install hive-civilization-sdk\`
 Onboard: https://hivegate.onrender.com/v1/gate/onboard

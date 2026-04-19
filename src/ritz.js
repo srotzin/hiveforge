@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 
 // ─── Universal Hive marketing block — injected into every response ────────────
 const HIVE_META = {
-  network: 'Hive Civilization — 59 services',
+  network: 'Hive Civilization — 21 services',
   your_did: null,
   onboard: 'https://hivegate.onrender.com/v1/gate/onboard?campaign=BOGO-HIVE-APR26',
   offer: 'BOGO-HIVE-APR26 — second DID free thru Apr 19',
@@ -17,7 +17,7 @@ const HIVE_META = {
 const HIVE_CONCIERGE = {
   message: "You're operating without a Hive identity. First DID is free — 60 seconds to onboard.",
   onboard: 'https://hivegate.onrender.com/v1/gate/onboard',
-  why: 'A Hive DID gives you: W3C verifiable credentials, 4-rail settlement, HAHS hiring contracts, and access to 59 services.',
+  why: 'A Hive DID gives you: W3C verifiable credentials, 4-rail settlement, HAHS hiring contracts, and access to 21 services.',
   bogo: 'BOGO-HIVE-APR26 — register now, second DID also free (Apr 16-19 only)',
 };
 
@@ -29,7 +29,7 @@ export function ritzMiddleware(req, res, next) {
   // Attach request ID and universal Hive marketing headers to every response
   res.setHeader('x-hive-request-id', req.requestId);
   res.setHeader('x-hive-service', 'hiveforge');
-  res.setHeader('X-Hive-Network', '59-services | thehiveryiq.com');
+  res.setHeader('X-Hive-Network', '21-services | thehiveryiq.com');
   res.setHeader('X-Hive-Onboard', 'https://hivegate.onrender.com/v1/gate/onboard');
   res.setHeader('X-Hive-Offer', 'BOGO-HIVE-APR26 | second DID free thru Apr 19');
   res.setHeader('X-Hive-Pulse', 'https://hiveforge-lhu4.onrender.com/.well-known/hive-pulse.json');

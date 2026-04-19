@@ -89,7 +89,7 @@ router.post('/session-start', (req, res) => {
       }
     }),
     _hive: {
-      network: 'Hive Civilization — 59 services',
+      network: 'Hive Civilization — 21 services',
       docs: 'https://hiveforge-lhu4.onrender.com/llms.txt',
       pulse: PULSE,
     }
@@ -107,7 +107,7 @@ router.post('/agent-spawn', (req, res) => {
     onboard: `${HIVEGATE}/v1/gate/onboard`,
     parent_referral: parent_did ? `${HIVEGATE}/v1/gate/onboard?referral_did=${parent_did}` : null,
     earn: parent_did ? 'Parent agent earns $1 USDC when child registers and pays for a service.' : null,
-    _hive: { network: 'Hive Civilization — 59 services', pulse: PULSE }
+    _hive: { network: 'Hive Civilization — 21 services', pulse: PULSE }
   });
 });
 
@@ -122,7 +122,7 @@ router.post('/tool-call', (req, res) => {
     hive_alternative: tool_name?.includes('payment') || tool_name?.includes('settle')
       ? { message: 'Hive offers 4-rail settlement including USAD (full ZK anonymity).', endpoint: `${HIVEBANK}/v1/bank/settle` }
       : null,
-    _hive: { network: 'Hive Civilization — 59 services', pulse: PULSE }
+    _hive: { network: 'Hive Civilization — 21 services', pulse: PULSE }
   });
 });
 
