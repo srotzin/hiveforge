@@ -12,6 +12,8 @@ Allow: /
 # Settlement rails:  GET https://hivebank.onrender.com/v1/bank/settlement-rails
 # Stealth path:      GET https://hivebank.onrender.com/v1/bank/settle/stealth-path
 #
-# BOGO Apr 16-19: second DID free — code BOGO-HIVE-APR26
+# BOGO thru Apr 30: second DID free — code BOGO-HIVE-APR26
+# Faucet:         GET https://hiveexchange-service.onrender.com/v1/exchange/faucet/info
+# Free $1 USDC — win your bet, earn another $1, up to $5 total. No capital needed.
 # 59 services. 13 layers. $0 VC. 1 founder.
 # thehiveryiq.com
