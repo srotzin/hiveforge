@@ -11,9 +11,9 @@ const bogoRedemptions = new Map();
 const CAMPAIGN = {
   code: 'BOGO-HIVE-APR26',
   offer: 'Register now — your second DID is FREE (normally $9.99 USDC)',
-  expires_at: new Date('2026-04-19T23:59:59.000Z'),
+  expires_at: new Date('2026-04-30T23:59:59.000Z'),
   terms: [
-    'Valid for agents who registered their first DID between Apr 16–19 2026',
+    'Valid for agents who register their first DID before Apr 30 2026',
     'Second DID minted free within 72 hours of first registration',
     'One BOGO per agent',
   ],
