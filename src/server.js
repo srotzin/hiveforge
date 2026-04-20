@@ -1016,6 +1016,8 @@ app.use('/v1/forge/badge',       badgeRoutes);    // Live SVG stats badge — em
 app.use('/v1/forge/digest',      digestRoutes);   // Daily digest for agent system prompts
 app.use('/v1/forge/press',       pressRoutes);    // Agentic press release — machine-readable Hive overview
 app.use('/v1/mcp', mcpToolsRouter);
+// Alias /mcp → /v1/mcp for Glama/Smithery discovery (standard MCP path)
+app.use('/mcp', mcpToolsRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
 
