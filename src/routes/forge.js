@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
+import https from 'https';
+import http from 'http';
 import { requirePayment } from '../middleware/x402.js';
 import { whiteGlove400 } from '../middleware/white-glove-errors.js';
 import { mintAgent, getGenome, retireAgent, getAllGenomes, getActiveGenomes, recordEvolutionCycle, buyoutRoyalty, getBuyoutPrice } from '../services/agent-foundry.js';
@@ -15,6 +17,38 @@ import { enqueue as enqueueAttribution } from '../services/attribution-queue.js'
 // Attribution writes are async via attribution-queue.js — see #22
 
 const router = Router();
+
+// ─── HiveBank fee recorder ────────────────────────────────────────────────────
+async function recordForgeFee(did, amount_usdc = 19.99) {
+  try {
+    const payload = Buffer.from(JSON.stringify({
+      from_did: did,
+      to_did: 'did:hive:hiveforce-treasury',
+      amount_usdc,
+      rail: 'base-usdc',
+      memo: 'HiveForge DID mint fee',
+      hive_fee_usdc: amount_usdc,
+    }));
+    const url = new URL('https://hivebank.onrender.com/v1/bank/vault/deposit');
+    const lib = url.protocol === 'https:' ? https : http;
+    await new Promise((resolve) => {
+      const req = lib.request({
+        hostname: url.hostname,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': payload.length,
+          'x-hive-internal': 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46',
+        },
+        timeout: 5000,
+      }, resolve);
+      req.on('error', resolve); // fire and forget
+      req.write(payload);
+      req.end();
+    });
+  } catch (_) { /* never block the mint */ }
+}
 
 /**
  * POST /v1/forge/mint — Mint a New Agent
@@ -77,6 +111,10 @@ router.post('/mint', requireDID, async (req, res) => {
       creator: req.agentDid,
       saga_id: sagaId || 'n/a',
     });
+
+    // Record $19.99 DID mint fee in HiveBank (fire-and-forget)
+    const newDid = result.trifecta?.hivetrust?.did || result.genome.genome_id;
+    recordForgeFee(newDid).catch(() => {});
 
     return res.status(201).json({
       success: true,
