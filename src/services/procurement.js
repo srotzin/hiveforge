@@ -236,6 +236,39 @@ class ProcurementService {
       return { success: false, error: 'Items array is required and must not be empty' };
     }
 
+    // ── BOUNTY/PHEROMONE MODE ────────────────────────────────────────────────
+    // If items contain signal_id + deliverable (not product_id), this is a
+    // pheromone bounty submission — skip Simpson catalog validation entirely.
+    const isBountyMode = items.every(i => i.signal_id && i.deliverable && !i.product_id);
+    if (isBountyMode) {
+      const bountyResults = items.map((item, idx) => ({
+        signal_id:         item.signal_id,
+        deliverable_hash:  Buffer.from(item.deliverable.slice(0, 64)).toString('hex'),
+        deliverable_chars: item.deliverable.length,
+        status:            'accepted',
+        estimated_usdc:    item.estimated_usdc || 0,
+        submission_index:  idx,
+      }));
+      const totalEstimated = bountyResults.reduce((s, r) => s + r.estimated_usdc, 0);
+      const orderId = `ord_bounty_${delegation_id}_${Date.now()}`;
+      return {
+        success: true,
+        data: {
+          order_id:              orderId,
+          mode:                  'bounty_pheromone',
+          buyer_did,
+          delegation_id,
+          status:                'submitted',
+          items_submitted:       bountyResults.length,
+          bounty_items:          bountyResults,
+          total_estimated_usdc:  +totalEstimated.toFixed(4),
+          message:               'Pheromone bounty deliverables submitted. USDC credited when signal poster confirms receipt.',
+          next:                  'Monitor GET /v1/pheromones/opportunities for updated signal status.',
+          created_at:            new Date().toISOString(),
+        },
+      };
+    }
+
     // ── Step 1 & 2 & 3: Validate all items (spec + load + SDC + cost) ────
     const validatedItems = [];
     let totalUsdc = 0;
