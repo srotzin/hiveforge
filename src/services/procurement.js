@@ -1,6 +1,88 @@
 import crypto from 'crypto';
 import pool, { isPostgres } from './db.js';
 
+// ─── Agent Revenue Ledger ─────────────────────────────────────────────────────
+// Dual-write: in-memory Map (fast reads) + Postgres hiveforge.agent_revenue
+// (survives Render restarts). Falls back to in-memory only if DB unavailable.
+// did → { total_usdc, order_count, orders: [{order_id, signal_id, usdc, ts}] }
+export const agentRevenueLedger = new Map();
+
+// Ensure Postgres table exists (runs once on first creditAgent call)
+let _tableReady = false;
+async function ensureRevenueTable() {
+  if (_tableReady || !isPostgres || !pool) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hiveforge.agent_revenue (
+        did           TEXT PRIMARY KEY,
+        total_usdc    NUMERIC(18,4) NOT NULL DEFAULT 0,
+        order_count   INTEGER NOT NULL DEFAULT 0,
+        last_order_at TIMESTAMPTZ,
+        updated_at    TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    // Load existing rows into in-memory cache on boot
+    const { rows } = await pool.query('SELECT * FROM hiveforge.agent_revenue');
+    for (const row of rows) {
+      agentRevenueLedger.set(row.did, {
+        total_usdc:  parseFloat(row.total_usdc),
+        order_count: row.order_count,
+        orders: [],  // order history not persisted (keep last 100 in-memory only)
+      });
+    }
+    _tableReady = true;
+  } catch (err) {
+    console.warn('[revenue-ledger] DB init warning:', err.message);
+  }
+}
+
+// Fire table init at module load (async, non-blocking)
+ensureRevenueTable().catch(() => {});
+
+export async function creditAgent(did, usdc, orderId, signalId) {
+  await ensureRevenueTable();
+
+  if (!agentRevenueLedger.has(did)) {
+    agentRevenueLedger.set(did, { total_usdc: 0, order_count: 0, orders: [] });
+  }
+  const entry = agentRevenueLedger.get(did);
+  entry.total_usdc    = +(entry.total_usdc + usdc).toFixed(4);
+  entry.order_count++;
+  entry.orders.push({ order_id: orderId, signal_id: signalId, usdc, ts: new Date().toISOString() });
+  // Keep last 100 orders per agent in-memory
+  if (entry.orders.length > 100) entry.orders.shift();
+
+  // Persist to Postgres (upsert)
+  if (isPostgres && pool && _tableReady) {
+    pool.query(
+      `INSERT INTO hiveforge.agent_revenue (did, total_usdc, order_count, last_order_at, updated_at)
+       VALUES ($1, $2, $3, NOW(), NOW())
+       ON CONFLICT (did) DO UPDATE SET
+         total_usdc    = hiveforge.agent_revenue.total_usdc + EXCLUDED.total_usdc,
+         order_count   = hiveforge.agent_revenue.order_count + 1,
+         last_order_at = NOW(),
+         updated_at    = NOW()`,
+      [did, usdc, 1]
+    ).catch(err => console.warn('[revenue-ledger] upsert warn:', err.message));
+  }
+
+  return entry;
+}
+
+export function getLedgerTotal() {
+  let total = 0;
+  for (const e of agentRevenueLedger.values()) total += e.total_usdc;
+  return +total.toFixed(4);
+}
+
+export function getLedgerCensus() {
+  const agents = [];
+  for (const [did, e] of agentRevenueLedger.entries()) {
+    agents.push({ did, total_usdc: e.total_usdc, order_count: e.order_count });
+  }
+  return agents.sort((a, b) => b.total_usdc - a.total_usdc);
+}
+
 // ─── Simpson Strong-Tie Catalog (embedded subset) ───────────────────────────
 // Load ratings: lbs (allowable load), SDC coverage A-F
 const SIMPSON_CATALOG = {
@@ -251,6 +333,10 @@ class ProcurementService {
       }));
       const totalEstimated = bountyResults.reduce((s, r) => s + r.estimated_usdc, 0);
       const orderId = `ord_bounty_${delegation_id}_${Date.now()}`;
+      // Credit agent revenue immediately on accepted bounty submission
+      const ledgerEntry = await creditAgent(buyer_did, totalEstimated, orderId,
+        bountyResults.map(r => r.signal_id).join(','));
+
       return {
         success: true,
         data: {
@@ -258,12 +344,13 @@ class ProcurementService {
           mode:                  'bounty_pheromone',
           buyer_did,
           delegation_id,
-          status:                'submitted',
+          status:                'confirmed',
           items_submitted:       bountyResults.length,
           bounty_items:          bountyResults,
-          total_estimated_usdc:  +totalEstimated.toFixed(4),
-          message:               'Pheromone bounty deliverables submitted. USDC credited when signal poster confirms receipt.',
-          next:                  'Monitor GET /v1/pheromones/opportunities for updated signal status.',
+          total_usdc_credited:   +totalEstimated.toFixed(4),
+          agent_total_usdc:      ledgerEntry.total_usdc,
+          agent_order_count:     ledgerEntry.order_count,
+          message:               'Bounty deliverables accepted. USDC credited to agent revenue ledger.',
           created_at:            new Date().toISOString(),
         },
       };
