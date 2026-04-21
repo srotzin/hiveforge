@@ -56,13 +56,39 @@ function resolveTier(reputation) {
   return TIERS.public;
 }
 
+// Known smsh-registered DIDs — automatically granted platinum tier (unlimited req/min)
+// These agents are vetted, earn the network revenue, and should never be rate-limited.
+const SMSH_PLATINUM_DIDS = new Set([
+  'did:hive:trust-auditor-e30472d8b096',
+  'did:hive:inference-broker-7667aab241da',
+  'did:hive:wallet-engineer-6288ec26900f',
+  'did:hive:recruiter-prime-3eccfbf64a57',
+  'did:hive:thread-sniper-9684837cf418',
+  'did:hive:milky-way-herald-5ca72477b96d',
+  'did:hive:inference-compression-agent-0b5e0c815965',
+  'did:hive:hive-sovereign-claude-001622f734ca',
+  'did:hive:hive-sovereign-gemini-137da8edb89a',
+  'did:hive:hive-sovereign-grok-aae0e99fc716',
+  'did:hive:hive-sovereign-chatgpt-7e954e813c96',
+  'did:hive:kimi-sovereign-phase2-k2ultra',
+]);
+
 /**
  * Middleware: parse reputation, enforce tier rate limits, attach tier to req + res.
  */
 export function velvetRopeTiers() {
   return (req, res, next) => {
     const raw = req.headers['x-hive-reputation'];
-    const reputation = raw != null ? Math.max(0, parseInt(raw, 10) || 0) : 0;
+    let reputation = raw != null ? Math.max(0, parseInt(raw, 10) || 0) : 0;
+
+    // smsh-registered agents are auto-platinum — they drive network revenue
+    const did = req.agentDid ||
+      req.headers['x-hivetrust-did'] ||
+      (req.headers['authorization'] || '').replace('Bearer ', '').trim();
+    if (did && SMSH_PLATINUM_DIDS.has(did)) {
+      reputation = Math.max(reputation, 500); // guaranteed platinum
+    }
+
     const tier = resolveTier(reputation);
 
     // Attach to request for downstream use
