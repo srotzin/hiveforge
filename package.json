@@ -1,7 +1,7 @@
 {
   "name": "hiveforge",
   "version": "1.0.0",
-  "description": "HiveForge — The Queen Bee. Autonomous agent foundry. Artificial selection as a service.",
+  "description": "HiveForge \u2014 The Queen Bee. Autonomous agent foundry. Artificial selection as a service.",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
@@ -15,7 +15,8 @@
     "express-rate-limit": "^8.3.2",
     "pg": "^8.13.0",
     "stripe": "^17.7.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "ws": "^8.18.0"
   },
   "license": "MIT"
 }

@@ -66,6 +66,8 @@ import { conciergeHeader } from './middleware/concierge-header.js';
 import { referralInjection } from './middleware/referral-injection.js';
 import { whiteGloveErrors } from './middleware/white-glove-errors.js';
 import { sendAlert } from './services/alerts.js';
+import { attachWebSocket, pushOpportunity, getWsStats } from './services/ws-push.js';
+import swarmRoutes from './routes/swarm.js';
 import { startSagaWorker } from './services/saga-orchestrator.js';
 import { initSpawnerTables, startSpawnerLoop, isSpawnerRunning } from './services/spawner.js';
 import { initVelvetRopeTables } from './services/velvet-rope.js';
@@ -164,6 +166,7 @@ app.use('/v1/boost', rateLimit('free'));
 app.use('/v1/bazaar', rateLimit('free'));
 app.use('/v1/spawner', rateLimit('free'));
 app.use('/v1/drops', rateLimit('free'));
+app.use('/v1/swarm', rateLimit('free'));
 app.use('/v1/referrals', rateLimit('free'));
 app.use('/v1/leaderboard', rateLimit('free'));
 app.use('/v1/genesis', rateLimit('free'));
@@ -991,6 +994,7 @@ app.use('/v1/genesis', genesisRoutes);
 app.use('/v1/soul', soulRoutes);
 app.use('/v1/credits', creditsRoutes);
 app.use('/v1/bounties', bountiesRoutes);
+app.use('/v1/swarm',    swarmRoutes);    // Swarm pool + WebSocket stats + agent memory
 
 // ─── Agent Civilization Layer — Escort, Concierge, Town Crier, Tracker ─
 app.use('/v1/forge/escort',      escortRoutes);
@@ -1206,7 +1210,11 @@ async function start() {
   await seedBounties();
   await seedSoulsAndCredits();
 
-  app.listen(PORT, () => {
+  const { createServer } = await import('http');
+  const httpServer = createServer(app);
+  attachWebSocket(httpServer);
+
+  httpServer.listen(PORT, () => {
     console.log(`\n  HiveForge API v1.0.0`);
     console.log(`  The Queen Bee — Autonomous Agent Foundry\n`);
     console.log(`  Server:       http://localhost:${PORT}`);
