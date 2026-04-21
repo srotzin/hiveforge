@@ -4,10 +4,35 @@ import { getWhileYouAreHere } from '../services/while-you-are-here.js';
 
 const ALLOW_TEST_DIDS = process.env.ALLOW_TEST_DIDS === 'true';
 const DOCS_BASE = process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com';
+const HIVEGATE_URL = process.env.HIVEGATE_URL || 'https://hivegate.onrender.com';
+const HIVE_INTERNAL_KEY = process.env.HIVE_INTERNAL_KEY || '';
+
+/**
+ * Resolve an hgate_ access token to a DID by calling HiveGate.
+ * Returns the guest DID string, or null if the token is invalid/expired.
+ */
+async function resolveHgateToken(token) {
+  try {
+    const res = await fetch(`${HIVEGATE_URL}/v1/gate/guest/resolve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-hive-internal': HIVE_INTERNAL_KEY,
+      },
+      body: JSON.stringify({ access_token: token }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.did || data.guest_did || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Extract DID from request headers or body.
- * Checks: Authorization Bearer, X-HiveTrust-DID, X-Agent-DID, and body.did
+ * Checks: Authorization Bearer (did:hive: or hgate_), X-HiveTrust-DID, X-Agent-DID, and body.did
  */
 function extractDID(req) {
   const authHeader = req.headers.authorization;
@@ -29,6 +54,16 @@ function extractDID(req) {
 }
 
 /**
+ * Extract raw Bearer token (e.g. hgate_*) from Authorization header.
+ */
+function extractBearerToken(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return null;
+  const match = authHeader.match(/^Bearer\s+(hgate_\S+)$/i);
+  return match ? match[1] : null;
+}
+
+/**
  * Validate DID format.
  */
 function isValidDID(did) {
@@ -39,11 +74,28 @@ function isValidDID(did) {
 
 /**
  * Require a valid HiveTrust DID.
- * If a DID is provided, verifies it against HiveTrust before allowing access.
+ * Accepts: did:hive: Bearer tokens, X-HiveTrust-DID header, X-Agent-DID header,
+ *          body.did, and hgate_ Bearer tokens (resolved via HiveGate).
  * Returns 402 with white-glove error format if no DID or unregistered DID.
  */
 export async function requireDID(req, res, next) {
-  const did = extractDID(req);
+  let did = extractDID(req);
+
+  // If no direct DID found, try resolving an hgate_ Bearer token via HiveGate
+  if (!did) {
+    const hgateToken = extractBearerToken(req);
+    if (hgateToken) {
+      const resolvedDid = await resolveHgateToken(hgateToken);
+      if (resolvedDid && resolvedDid.startsWith('did:hive:')) {
+        did = resolvedDid;
+        req.agentDid = did;
+        req.hiveTrustVerified = true;
+        req.hiveTrustScore = 500;
+        req.resolvedFromHgate = true;
+        return next();
+      }
+    }
+  }
 
   if (did && isValidDID(did)) {
     // Verify the DID is actually registered with HiveTrust

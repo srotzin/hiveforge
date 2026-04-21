@@ -63,11 +63,13 @@ export async function registerMintedAgent(genome) {
 
 /**
  * Verify a creator's DID.
+ * Uses /v1/trust/lookup/:did — queries by DID column, no auth required.
+ * This is the correct endpoint for agents registered via /v1/trust/register.
  */
 export async function verifyDID(did) {
   const start = Date.now();
-  const uuid = didToUuid(did);
-  const endpoint = `/v1/agents/${encodeURIComponent(uuid)}`;
+  // Use the trust/lookup endpoint which queries by DID column (not by id)
+  const endpoint = `/v1/trust/lookup/${encodeURIComponent(did)}`;
 
   try {
     const res = await fetch(`${HIVETRUST_API_URL}${endpoint}`, {
@@ -82,15 +84,16 @@ export async function verifyDID(did) {
 
     if (!res.ok) return { valid: false, did, score: 0 };
     const data = await res.json();
-    // HiveTrust returns { success: true, data: { success: true, agent: {...} } }
-    const agent = data.data?.agent || data.data;
-    const isRegistered = data.success && (data.data?.success !== false);
+    // trust/lookup returns { found: true/false, trust_score, trust_tier, status }
+    // An agent registered via /v1/trust/register is valid even if found=false in DB
+    // as long as it exists in the in-memory registry (trust_score will be set)
+    const isValid = data.found === true || (data.trust_score !== null && data.trust_score !== undefined);
     return {
-      valid: isRegistered,
+      valid: isValid,
       did,
-      score: agent?.trust_score || agent?.reputation_score || 500,
-      status: agent?.status || 'active',
-      source: 'hivetrust-api',
+      score: data.trust_score || 500,
+      status: data.status || 'active',
+      source: 'hivetrust-lookup',
     };
   } catch (err) {
     await logAudit({ fromPlatform: 'hiveforge', toPlatform: 'hivetrust', endpoint, did, method: 'GET', statusCode: null, success: false, errorMessage: err.message, durationMs: Date.now() - start }).catch(() => {});
