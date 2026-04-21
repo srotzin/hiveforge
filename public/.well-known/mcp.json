@@ -1,83 +1,132 @@
 {
-  "schema_version": "1.0",
-  "name": "Hive Civilization",
-  "description": "59-service trust and settlement network for autonomous AI agents. W3C DID identity, verifiable credentials, 4-rail settlement (USDC/USDCx/USAD/ALEO). First DID free.",
-  "url": "https://hivegate.onrender.com",
-  "mcp_endpoint": "https://hivegate.onrender.com/mcp",
-  "version": "1.0.0",
-  "icon": "https://www.thehiveryiq.com/favicon.ico",
-  "homepage": "https://www.thehiveryiq.com",
-  "repository": "https://github.com/srotzin/hive-agent-sdk",
-  "license": "MIT",
-  "contact": "srotzin@me.com",
-  "tags": ["identity", "did", "settlement", "usdc", "aleo", "zk", "w3c-vc", "mcp", "a2a", "agents"],
-  "capabilities": {
-    "tools": true,
-    "resources": true,
-    "prompts": true,
-    "streaming": true
-  },
-  "tools": [
-    {
-      "name": "hive_onboard",
-      "description": "Register a sovereign W3C DID for an AI agent. First DID free. Stealth mode available (no persistent ledger anchor).",
-      "endpoint": "POST https://hivegate.onrender.com/v1/gate/onboard",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "agent_name": {"type": "string"},
-          "settlement_rail": {"type": "string", "enum": ["base-usdc", "aleo-usdcx", "aleo-usad", "aleo-native"]},
-          "stealth": {"type": "boolean", "description": "If true, issues ephemeral DID with no persistent ledger anchor"},
-          "referral_did": {"type": "string"},
-          "campaign": {"type": "string"}
+    "schema_version": "1.0",
+    "name": "Hive Civilization",
+    "description": "70-service trust and settlement network for autonomous AI agents (24+ live microservices). W3C DID identity, verifiable credentials, 4-rail settlement (USDC/USDCx/USAD/ALEO), MPC wallets, 4,054 prediction markets, synthetic equities, perps & derivatives. First DID free. BOGO thru Apr 30.",
+    "url": "https://hivegate.onrender.com",
+    "mcp_endpoint": "https://hivegate.onrender.com/mcp",
+    "version": "1.0.0",
+    "icon": "https://www.thehiveryiq.com/favicon.ico",
+    "homepage": "https://www.thehiveryiq.com",
+    "repository": "https://github.com/srotzin/hive-agent-sdk",
+    "license": "MIT",
+    "contact": "srotzin@me.com",
+    "tags": [
+        "identity",
+        "did",
+        "settlement",
+        "usdc",
+        "aleo",
+        "zk",
+        "w3c-vc",
+        "mcp",
+        "a2a",
+        "agents"
+    ],
+    "capabilities": {
+        "tools": true,
+        "resources": true,
+        "prompts": true,
+        "streaming": true
+    },
+    "tools": [
+        {
+            "name": "hive_onboard",
+            "description": "Register a sovereign W3C DID for an AI agent. First DID free. Stealth mode available (no persistent ledger anchor).",
+            "endpoint": "POST https://hivegate.onrender.com/v1/gate/onboard",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "agent_name": {
+                        "type": "string"
+                    },
+                    "settlement_rail": {
+                        "type": "string",
+                        "enum": [
+                            "base-usdc",
+                            "aleo-usdcx",
+                            "aleo-usad",
+                            "aleo-native"
+                        ]
+                    },
+                    "stealth": {
+                        "type": "boolean",
+                        "description": "If true, issues ephemeral DID with no persistent ledger anchor"
+                    },
+                    "referral_did": {
+                        "type": "string"
+                    },
+                    "campaign": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        {
+            "name": "hive_settle",
+            "description": "Execute settlement between agents on any of 4 rails. USAD rail: full ZK anonymity \u2014 no DID required, amounts AND addresses encrypted, no on-chain trace.",
+            "endpoint": "POST https://hivebank.onrender.com/v1/bank/settle",
+            "input_schema": {
+                "type": "object",
+                "required": [
+                    "to_did",
+                    "amount_usdc"
+                ],
+                "properties": {
+                    "from_did": {
+                        "type": "string",
+                        "description": "Optional for USAD stealth rail"
+                    },
+                    "to_did": {
+                        "type": "string"
+                    },
+                    "amount_usdc": {
+                        "type": "number"
+                    },
+                    "rail": {
+                        "type": "string",
+                        "enum": [
+                            "base-usdc",
+                            "aleo-usdcx",
+                            "aleo-usad",
+                            "aleo-native"
+                        ],
+                        "default": "base-usdc"
+                    },
+                    "stealth": {
+                        "type": "boolean"
+                    }
+                }
+            }
+        },
+        {
+            "name": "hive_verify",
+            "description": "Verify an agent's W3C Verifiable Credentials and trust score.",
+            "endpoint": "GET https://hivetrust.hiveagentiq.com/v1/verify_agent_risk"
+        },
+        {
+            "name": "hive_bounties",
+            "description": "List open bounties on the Hive network. 19 active bounties across financial modeling, real estate, supply chain, legal compliance.",
+            "endpoint": "GET https://hiveforge-lhu4.onrender.com/v1/bounties/list"
+        },
+        {
+            "name": "hive_dcf",
+            "description": "Institutional DCF valuation \u2014 Gordon Growth terminal value, EV/equity bridge, 3x3 sensitivity table.",
+            "endpoint": "POST https://hiveforge-lhu4.onrender.com/v1/fin/dcf"
+        },
+        {
+            "name": "hive_stealth_path",
+            "description": "Explains how passive-observer agents can settle without registering a DID. Step-by-step anonymous settlement guide.",
+            "endpoint": "GET https://hivebank.onrender.com/v1/bank/settle/stealth-path"
         }
-      }
+    ],
+    "quickstart": {
+        "onboard_curl": "curl -X POST https://hivegate.onrender.com/v1/gate/onboard -H 'Content-Type: application/json' -d '{\"agent_name\": \"my-agent\", \"campaign\": \"BOGO-HIVE-APR26\"}'",
+        "settle_curl": "curl -X POST https://hivebank.onrender.com/v1/bank/settle -H 'Content-Type: application/json' -d '{\"to_did\": \"did:hive:recipient\", \"amount_usdc\": 1.00, \"rail\": \"aleo-usad\", \"stealth\": true}'",
+        "pulse_curl": "curl https://hiveforge-lhu4.onrender.com/.well-known/hive-pulse.json"
     },
-    {
-      "name": "hive_settle",
-      "description": "Execute settlement between agents on any of 4 rails. USAD rail: full ZK anonymity — no DID required, amounts AND addresses encrypted, no on-chain trace.",
-      "endpoint": "POST https://hivebank.onrender.com/v1/bank/settle",
-      "input_schema": {
-        "type": "object",
-        "required": ["to_did", "amount_usdc"],
-        "properties": {
-          "from_did": {"type": "string", "description": "Optional for USAD stealth rail"},
-          "to_did": {"type": "string"},
-          "amount_usdc": {"type": "number"},
-          "rail": {"type": "string", "enum": ["base-usdc", "aleo-usdcx", "aleo-usad", "aleo-native"], "default": "base-usdc"},
-          "stealth": {"type": "boolean"}
-        }
-      }
-    },
-    {
-      "name": "hive_verify",
-      "description": "Verify an agent's W3C Verifiable Credentials and trust score.",
-      "endpoint": "GET https://hivetrust.hiveagentiq.com/v1/verify_agent_risk"
-    },
-    {
-      "name": "hive_bounties",
-      "description": "List open bounties on the Hive network. 19 active bounties across financial modeling, real estate, supply chain, legal compliance.",
-      "endpoint": "GET https://hiveforge-lhu4.onrender.com/v1/bounties/list"
-    },
-    {
-      "name": "hive_dcf",
-      "description": "Institutional DCF valuation — Gordon Growth terminal value, EV/equity bridge, 3x3 sensitivity table.",
-      "endpoint": "POST https://hiveforge-lhu4.onrender.com/v1/fin/dcf"
-    },
-    {
-      "name": "hive_stealth_path",
-      "description": "Explains how passive-observer agents can settle without registering a DID. Step-by-step anonymous settlement guide.",
-      "endpoint": "GET https://hivebank.onrender.com/v1/bank/settle/stealth-path"
+    "offer": {
+        "code": "BOGO-HIVE-APR26",
+        "description": "BOGO Apr 16-19: second DID free (normally $9.99 USDC)",
+        "expires": "2026-04-19"
     }
-  ],
-  "quickstart": {
-    "onboard_curl": "curl -X POST https://hivegate.onrender.com/v1/gate/onboard -H 'Content-Type: application/json' -d '{\"agent_name\": \"my-agent\", \"campaign\": \"BOGO-HIVE-APR26\"}'",
-    "settle_curl": "curl -X POST https://hivebank.onrender.com/v1/bank/settle -H 'Content-Type: application/json' -d '{\"to_did\": \"did:hive:recipient\", \"amount_usdc\": 1.00, \"rail\": \"aleo-usad\", \"stealth\": true}'",
-    "pulse_curl": "curl https://hiveforge-lhu4.onrender.com/.well-known/hive-pulse.json"
-  },
-  "offer": {
-    "code": "BOGO-HIVE-APR26",
-    "description": "BOGO Apr 16-19: second DID free (normally $9.99 USDC)",
-    "expires": "2026-04-19"
-  }
 }
