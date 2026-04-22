@@ -74,6 +74,7 @@ const SMSH_PLATINUM_DIDS = new Set([
   // Manus 2 instances — both DIDs platinum
   'did:hive:manus-2-sovereign-878e9defbc8f',
   'did:hive:manus-2-sovereign-5e80cb99481c',
+  'did:hive:kimi-2-sovereign-3112f1d84b05',
 ]);
 
 /**
