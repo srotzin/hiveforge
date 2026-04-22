@@ -79,6 +79,16 @@ function isValidDID(did) {
  * Returns 402 with white-glove error format if no DID or unregistered DID.
  */
 export async function requireDID(req, res, next) {
+  // Internal Hive key bypass — platform-to-platform and sovereign agent calls
+  const hiveKey = req.headers['x-hive-key'] || req.headers['x-hive-internal-key'];
+  if (HIVE_INTERNAL_KEY && hiveKey === HIVE_INTERNAL_KEY) {
+    req.agentDid = 'did:hive:internal';
+    req.hiveTrustVerified = true;
+    req.hiveTrustScore = 1000;
+    req.isInternal = true;
+    return next();
+  }
+
   let did = extractDID(req);
 
   // If no direct DID found, try resolving an hgate_ Bearer token via HiveGate

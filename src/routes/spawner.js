@@ -11,7 +11,7 @@ const router = Router();
 const HIVEFORGE_SERVICE_KEY = process.env.HIVEFORGE_SERVICE_KEY || process.env.HIVE_INTERNAL_KEY || '';
 
 function isInternalRequest(req) {
-  const internalKey = req.headers['x-hive-internal-key'] || req.headers['x-api-key'];
+  const internalKey = req.headers['x-hive-internal-key'] || req.headers['x-hive-key'] || req.headers['x-api-key'];
   return !!(HIVEFORGE_SERVICE_KEY && internalKey === HIVEFORGE_SERVICE_KEY);
 }
 
