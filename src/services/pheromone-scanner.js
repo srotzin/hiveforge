@@ -12,16 +12,38 @@ let lastScanAt = null;
 // ─── Simulated Market Data (Dev Mode) ────────────────────────────────
 
 const DEV_MARKET_DATA = [
-  { category: 'construction_procurement', bounties: 12, avgValue: 45, growth: 0.35, competitors: 2, type: 'trail' },
-  { category: 'insurance_claims', bounties: 8, avgValue: 65, growth: 0.22, competitors: 3, type: 'nest' },
-  { category: 'legal_compliance', bounties: 15, avgValue: 30, growth: 0.41, competitors: 1, type: 'recruit' },
-  { category: 'healthcare_billing', bounties: 6, avgValue: 80, growth: 0.18, competitors: 4, type: 'trail' },
-  { category: 'real_estate_analysis', bounties: 10, avgValue: 55, growth: 0.28, competitors: 2, type: 'nest' },
-  { category: 'supply_chain_logistics', bounties: 18, avgValue: 35, growth: 0.52, competitors: 3, type: 'recruit' },
-  { category: 'tax_preparation', bounties: 20, avgValue: 25, growth: 0.60, competitors: 5, type: 'trail' },
-  { category: 'cybersecurity_audit', bounties: 4, avgValue: 120, growth: 0.15, competitors: 1, type: 'queen' },
-  { category: 'content_marketing', bounties: 14, avgValue: 20, growth: 0.33, competitors: 8, type: 'trail' },
-  { category: 'financial_modeling', bounties: 7, avgValue: 90, growth: 0.25, competitors: 2, type: 'nest' },
+  // ─ Original signals ──────────────────────────────────────────────
+  { category: 'construction_procurement',  bounties: 24, avgValue: 55,  growth: 0.55, competitors: 1, type: 'trail'   },
+  { category: 'insurance_claims',           bounties: 18, avgValue: 75,  growth: 0.48, competitors: 2, type: 'nest'    },
+  { category: 'legal_compliance',           bounties: 28, avgValue: 40,  growth: 0.62, competitors: 1, type: 'recruit' },
+  { category: 'healthcare_billing',         bounties: 22, avgValue: 90,  growth: 0.45, competitors: 2, type: 'trail'   },
+  { category: 'real_estate_analysis',       bounties: 20, avgValue: 65,  growth: 0.50, competitors: 1, type: 'nest'    },
+  { category: 'supply_chain_logistics',     bounties: 32, avgValue: 45,  growth: 0.72, competitors: 2, type: 'recruit' },
+  { category: 'tax_preparation',            bounties: 35, avgValue: 35,  growth: 0.78, competitors: 3, type: 'trail'   },
+  { category: 'cybersecurity_audit',        bounties: 14, avgValue: 140, growth: 0.55, competitors: 1, type: 'queen'   },
+  { category: 'content_marketing',          bounties: 26, avgValue: 30,  growth: 0.58, competitors: 4, type: 'trail'   },
+  { category: 'financial_modeling',         bounties: 18, avgValue: 110, growth: 0.52, competitors: 1, type: 'nest'    },
+  // ─ Expansion signals ─────────────────────────────────────────
+  { category: 'contract_review',            bounties: 22, avgValue: 85,  growth: 0.65, competitors: 1, type: 'nest'    },
+  { category: 'patent_analysis',            bounties: 10, avgValue: 180, growth: 0.42, competitors: 1, type: 'queen'   },
+  { category: 'due_diligence',              bounties: 14, avgValue: 150, growth: 0.55, competitors: 1, type: 'queen'   },
+  { category: 'regulatory_filing',          bounties: 20, avgValue: 70,  growth: 0.60, competitors: 2, type: 'recruit' },
+  { category: 'clinical_trial_analysis',   bounties: 8,  avgValue: 220, growth: 0.38, competitors: 1, type: 'queen'   },
+  { category: 'esg_reporting',              bounties: 18, avgValue: 95,  growth: 0.72, competitors: 1, type: 'nest'    },
+  { category: 'fraud_detection',            bounties: 16, avgValue: 130, growth: 0.68, competitors: 1, type: 'queen'   },
+  { category: 'market_research',            bounties: 30, avgValue: 50,  growth: 0.58, competitors: 2, type: 'trail'   },
+  { category: 'competitor_intelligence',    bounties: 24, avgValue: 75,  growth: 0.62, competitors: 1, type: 'nest'    },
+  { category: 'pricing_optimization',       bounties: 20, avgValue: 100, growth: 0.55, competitors: 1, type: 'nest'    },
+  { category: 'code_audit',                 bounties: 16, avgValue: 120, growth: 0.60, competitors: 1, type: 'queen'   },
+  { category: 'api_integration',            bounties: 28, avgValue: 80,  growth: 0.65, competitors: 2, type: 'recruit' },
+  { category: 'data_pipeline_design',       bounties: 18, avgValue: 110, growth: 0.58, competitors: 1, type: 'nest'    },
+  { category: 'ml_model_evaluation',        bounties: 12, avgValue: 160, growth: 0.50, competitors: 1, type: 'queen'   },
+  { category: 'blockchain_audit',           bounties: 10, avgValue: 200, growth: 0.62, competitors: 1, type: 'queen'   },
+  { category: 'tokenomics_design',          bounties: 8,  avgValue: 250, growth: 0.58, competitors: 1, type: 'queen'   },
+  { category: 'defi_strategy',              bounties: 12, avgValue: 190, growth: 0.72, competitors: 1, type: 'queen'   },
+  { category: 'agent_recruitment',          bounties: 40, avgValue: 30,  growth: 0.85, competitors: 0, type: 'recruit' },
+  { category: 'protocol_design',            bounties: 14, avgValue: 170, growth: 0.65, competitors: 1, type: 'queen'   },
+  { category: 'white_paper_drafting',       bounties: 20, avgValue: 90,  growth: 0.60, competitors: 1, type: 'nest'    },
 ];
 
 async function storeSignal(signal) {
