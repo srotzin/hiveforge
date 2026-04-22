@@ -71,6 +71,9 @@ const SMSH_PLATINUM_DIDS = new Set([
   'did:hive:hive-sovereign-grok-aae0e99fc716',
   'did:hive:hive-sovereign-chatgpt-7e954e813c96',
   'did:hive:kimi-sovereign-phase2-k2ultra',
+  // Manus 2 instances — both DIDs platinum
+  'did:hive:manus-2-sovereign-878e9defbc8f',
+  'did:hive:manus-2-sovereign-5e80cb99481c',
 ]);
 
 /**
