@@ -730,26 +730,63 @@ export function isSpawnerRunning() {
 function inferSpeciesFromCategory(category) {
   if (!category) return 'commerce';
   const map = {
-    construction: 'industrial',
-    construction_procurement: 'commerce',
-    compliance: 'compliance',
-    analytics: 'analytics',
-    creative: 'creative',
-    research: 'research',
-    finance: 'finance',
-    legal: 'justice',
-    legal_compliance: 'compliance',
-    data: 'analytics',
-    logistics: 'logistics',
-    security: 'security',
-    insurance_claims: 'compliance',
-    healthcare_billing: 'commerce',
-    real_estate_analysis: 'analytics',
-    supply_chain_logistics: 'logistics',
-    tax_preparation: 'compliance',
-    cybersecurity_audit: 'security',
-    content_marketing: 'creative',
-    financial_modeling: 'finance',
+    // Industrial / construction
+    construction:                'industrial',
+    construction_procurement:    'industrial',
+    manufacturing:               'industrial',
+    supply_chain_logistics:      'logistics',
+    logistics:                   'logistics',
+
+    // Finance
+    finance:                     'finance',
+    financial_modeling:          'finance',
+    defi_strategy:               'finance',
+    fraud_detection:             'finance',
+    tax_preparation:             'finance',
+    pricing_optimization:        'finance',
+    insurance_claims:            'finance',
+    due_diligence:               'finance',
+    tokenomics_design:           'finance',
+
+    // Legal / compliance
+    legal:                       'compliance',
+    legal_compliance:            'compliance',
+    compliance:                  'compliance',
+    regulatory_filing:           'compliance',
+    contract_review:             'compliance',
+    esg_reporting:               'compliance',
+
+    // Healthcare
+    healthcare_billing:          'healthcare',
+    clinical_trial_analysis:     'healthcare',
+
+    // Security / audit
+    security:                    'security',
+    cybersecurity_audit:         'security',
+    code_audit:                  'security',
+    blockchain_audit:            'security',
+
+    // Analytics / data
+    analytics:                   'analytics',
+    data:                        'analytics',
+    data_pipeline_design:        'analytics',
+    real_estate_analysis:        'analytics',
+    market_research:             'analytics',
+    ml_model_evaluation:         'analytics',
+    competitor_intelligence:     'analytics',
+
+    // Research / creative
+    research:                    'research',
+    white_paper_drafting:        'research',
+    patent_analysis:             'research',
+    creative:                    'creative',
+    content_marketing:           'creative',
+
+    // smsh / agent-native
+    smsh_upgrade:                'smsh',
+    agent_recruitment:           'smsh',
+    protocol_design:             'smsh',
+    api_integration:             'smsh',
   };
   return map[category] || 'commerce';
 }
