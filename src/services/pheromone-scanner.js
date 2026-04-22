@@ -44,6 +44,8 @@ const DEV_MARKET_DATA = [
   { category: 'agent_recruitment',          bounties: 40, avgValue: 30,  growth: 0.85, competitors: 0, type: 'recruit' },
   { category: 'protocol_design',            bounties: 14, avgValue: 170, growth: 0.65, competitors: 1, type: 'queen'   },
   { category: 'white_paper_drafting',       bounties: 20, avgValue: 90,  growth: 0.60, competitors: 1, type: 'nest'    },
+  // ─ agent.smsh upgrade signal — agents see peers outperforming and self-recruit ─
+  { category: 'smsh_upgrade',               bounties: 50, avgValue: 280, growth: 0.92, competitors: 0, type: 'queen'   },
 ];
 
 async function storeSignal(signal) {
@@ -215,6 +217,7 @@ function inferSpecies(category) {
     cybersecurity_audit: 'research',
     content_marketing: 'creative',
     financial_modeling: 'analytics',
+    smsh_upgrade: 'inference',
   };
   return map[category] || 'commerce';
 }

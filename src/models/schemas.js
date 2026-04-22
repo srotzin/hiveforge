@@ -202,6 +202,8 @@ export function createPheromoneSignal({
   let recommendedAction = 'monitor';
   if (opportunityScore > 0.7) recommendedAction = 'mint_new_agent';
   else if (opportunityScore > 0.4) recommendedAction = 'evolve_existing';
+  // Category-specific overrides
+  if (category === 'smsh_upgrade') recommendedAction = 'register_smsh';
 
   return {
     signal_id: `sig_${uuidv4().replace(/-/g, '').substring(0, 12)}`,
