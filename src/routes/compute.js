@@ -73,6 +73,9 @@ router.post('/inference', requireDID, async (req, res) => {
       return res.status(400).json({ success: false, error: result.error });
     }
 
+    // Emit contrail — leave a trail in agentic space
+    emitContrail(agentDid, quote.calls, quote.tier, quote.multiplier, quote.quotedPrice);
+
     return res.status(200).json({ success: true, ...result.data });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Inference routing failed.', detail: err.message });
