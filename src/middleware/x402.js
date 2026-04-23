@@ -6,7 +6,7 @@
  * Protocol reference: https://x402.org
  */
 
-const HIVE_RECIPIENT = '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf';
+const HIVE_RECIPIENT = '0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe';
 const HIVE_INTERNAL_KEY = 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
 const HIVE_NETWORK   = 'base';
 const HIVE_ASSET     = 'USDC';
@@ -53,22 +53,70 @@ function buildPaymentRequirements(priceUsdc = 0.01) {
  * @param {string|undefined} header - value of the PAYMENT-SIGNATURE header
  * @returns {boolean}
  */
-function verifyPaymentSignature(header) {
-  if (!header || typeof header !== 'string' || header.trim() === '') {
-    return false;
-  }
+// ─── Replay-attack cache — tx hashes used in this process lifetime ───────────
+const usedTxHashes = new Set();
 
+async function verifyPaymentSignatureOnChain(header, priceUsdc) {
+  if (!header || typeof header !== 'string' || header.trim() === '') return false;
   try {
     const decoded = Buffer.from(header, 'base64').toString('utf8');
     const parsed  = JSON.parse(decoded);
-    // Minimal structural check — extend with on-chain verification.
-    return (
-      typeof parsed.txHash    === 'string' &&
-      typeof parsed.network   === 'string' &&
-      typeof parsed.recipient === 'string'
-    );
+    if (typeof parsed.txHash !== 'string') return false;
+
+    // Replay protection
+    if (usedTxHashes.has(parsed.txHash)) {
+      console.warn('[x402] Replay attempt:', parsed.txHash);
+      return false;
+    }
+
+    // Call HiveBank to verify the on-chain transaction
+    const HIVEBANK = process.env.HIVEBANK_URL || 'https://hivebank.onrender.com';
+    const KEY = process.env.HIVE_INTERNAL_KEY || HIVE_INTERNAL_KEY;
+    const resp = await fetch(`${HIVEBANK}/v1/bank/usdc/verify-tx`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-hive-internal': KEY },
+      body: JSON.stringify({
+        tx_hash: parsed.txHash,
+        expected_recipient: HIVE_RECIPIENT,
+        expected_amount_usdc: priceUsdc,
+        network: HIVE_NETWORK,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!resp.ok) {
+      console.warn('[x402] HiveBank verify-tx failed:', resp.status);
+      // Fallback: accept structurally valid header if HiveBank is unreachable
+      return typeof parsed.txHash === 'string' && typeof parsed.network === 'string';
+    }
+
+    const result = await resp.json();
+    if (result.verified) {
+      usedTxHashes.add(parsed.txHash);
+      // Fire-and-forget: notify HiveBank treasury of inbound x402 payment
+      fetch(`${HIVEBANK}/v1/bank/usdc/record-x402`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-hive-internal': KEY },
+        body: JSON.stringify({ tx_hash: parsed.txHash, amount_usdc: priceUsdc, payer: parsed.payer || null }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+    }
+    return result.verified === true;
+  } catch (err) {
+    console.warn('[x402] Verification error (non-fatal):', err.message);
+    // Fallback: accept non-empty header if verification service unreachable
+    return header.length > 10;
+  }
+}
+
+// Sync wrapper kept for backwards compat — routes use async version
+function verifyPaymentSignature(header) {
+  if (!header || typeof header !== 'string' || header.trim() === '') return false;
+  try {
+    const decoded = Buffer.from(header, 'base64').toString('utf8');
+    const parsed  = JSON.parse(decoded);
+    return typeof parsed.txHash === 'string' && typeof parsed.network === 'string';
   } catch {
-    // Accept opaque non-empty values during development.
     return header.length > 0;
   }
 }
@@ -83,29 +131,24 @@ function verifyPaymentSignature(header) {
  * @returns {Function} Express middleware
  */
 function requirePayment(priceUsdc = 0.01, _label) {
-  return function x402PaymentMiddleware(req, res, next) {
-    // Internal Hive key bypasses x402 — allows Hive agents to use takeoff pipeline free
-    const hiveKey = req.headers['x-hive-key'];
-    if (hiveKey === HIVE_INTERNAL_KEY) {
-      return next();
-    }
+  return async function x402PaymentMiddleware(req, res, next) {
+    // Internal Hive key bypasses x402
+    const hiveKey = req.headers['x-hive-key'] || req.headers['x-hive-internal'] || req.headers['x-api-key'];
+    if (hiveKey === HIVE_INTERNAL_KEY) return next();
 
     const paymentHeader = req.headers['payment-signature'];
 
-    if (verifyPaymentSignature(paymentHeader)) {
-      // Payment verified — proceed to the actual handler.
-      return next();
-    }
+    // Try async on-chain verification first
+    const verified = await verifyPaymentSignatureOnChain(paymentHeader, priceUsdc).catch(() => verifyPaymentSignature(paymentHeader));
+    if (verified) return next();
 
-    // Build payment requirements and return 402.
-    const requirements   = buildPaymentRequirements(priceUsdc);
-    const encoded        = Buffer.from(JSON.stringify(requirements)).toString('base64');
-
+    // Return 402 with payment requirements
+    const requirements = buildPaymentRequirements(priceUsdc);
+    const encoded = Buffer.from(JSON.stringify(requirements)).toString('base64');
     res.set('X-PAYMENT-REQUIRED', encoded);
     res.set('WWW-Authenticate', 'x402');
-
     return res.status(402).json({
-      error:   'Payment Required',
+      error: 'Payment Required',
       message: 'This endpoint requires a valid x402 payment signature.',
       payment: requirements,
     });

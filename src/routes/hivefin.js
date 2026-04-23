@@ -23,7 +23,7 @@
  *   Advanced endpoints (monte-carlo, lbo): $0.75 USDC
  *
  * All responses include EU AI Act Article 12 ATG audit record.
- * USDC recipient: 0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf
+ * USDC recipient: 0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe
  */
 
 import { Router } from 'express';
@@ -37,7 +37,7 @@ const router = Router();
 
 const SERVICE = 'HiveFin';
 const VERSION = '1.0.0';
-const WALLET  = '0x78B3B3C356E89b5a69C488c6032509Ef4260B6bf';
+const WALLET  = '0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe';
 
 function meta(payload) {
   return {
