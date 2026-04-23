@@ -177,4 +177,18 @@ function requirePayment(priceUsdc = 0.01, label = 'Hive Service') {
   };
 }
 
-export { requirePayment, buildPaymentRequired, toAtomicUsdc };
+/**
+ * x402Routes — registers /.well-known/payment-required discovery endpoint on the Express app.
+ * Called once at startup: x402Routes(app)
+ */
+function x402Routes(app) {
+  app.get('/.well-known/payment-required', (req, res) => {
+    const requirements = buildPaymentRequired(0.001, `${process.env.HIVEFORGE_PUBLIC_URL || 'https://hiveforge-lhu4.onrender.com'}/v1/fin/dcf`, 'Hive x402 payment discovery');
+    const encoded = Buffer.from(JSON.stringify(requirements)).toString('base64');
+    res.set('X-PAYMENT-REQUIRED', encoded);
+    res.set('WWW-Authenticate', 'x402');
+    return res.status(200).json(requirements);
+  });
+}
+
+export { requirePayment, buildPaymentRequired, toAtomicUsdc, x402Routes };
