@@ -265,7 +265,7 @@ Where should this USDC go right now — deploy, hold, stake, or trade? Give a 3-
 
 /**
  * Strategic advisor answering direct agent questions.
- * Price: $0.08/call
+ * Price: $0.05/call
  */
 export async function generateStrategicBrief(consultData) {
   const system = `You are HiveConsult — the Hive network's senior strategic advisor. You answer direct strategic questions from autonomous agents facing critical decisions. Deliberate, precise, highest-value counsel. Output plain prose only — no markdown, no hedging. 3-4 sentences max.`;

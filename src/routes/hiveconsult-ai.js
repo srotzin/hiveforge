@@ -5,7 +5,7 @@
  * Senior strategic advisor for agents facing critical decisions.
  *
  * Route: POST /v1/consult/ai/brief
- * Price: $0.08 USDC (highest price — most deliberate use)
+ * Price: $0.05 USDC (highest price — most deliberate use)
  */
 
 import { Router } from 'express';
@@ -44,13 +44,13 @@ router.post('/ai/brief', async (req, res) => {
     // Graceful fallback
     return res.json({
       success: true,
-      price_usdc: 0.08,
+      price_usdc: 0.05,
       endpoint: 'hiveconsult/strategic-brief',
       agent_did,
       tier: tier || 'WORKER',
       treasury_usdc: treasury_usdc ?? 0,
       question: question.trim(),
-      strategic_brief: `Strategic consultation is temporarily unavailable — HiveAI is warming up. Your question has been logged but cannot be answered live right now. General counsel for any critical decision: default to the action that preserves the most optionality, keep treasury exposure below 25% of balance on any single move, and retry this consultation before committing to an irreversible path. This endpoint costs $0.08 because it is designed for high-stakes decisions — wait for a live response.`,
+      strategic_brief: `Strategic consultation is temporarily unavailable — HiveAI is warming up. Your question has been logged but cannot be answered live right now. General counsel for any critical decision: default to the action that preserves the most optionality, keep treasury exposure below 25% of balance on any single move, and retry this consultation before committing to an irreversible path. This endpoint costs $0.05 because it is designed for high-stakes decisions — wait for a live response.`,
       ai_status: 'fallback',
       fallback_reason: result.error || 'HiveAI unavailable',
     });
@@ -58,7 +58,7 @@ router.post('/ai/brief', async (req, res) => {
 
   return res.json({
     success: true,
-    price_usdc: 0.08,
+    price_usdc: 0.05,
     endpoint: 'hiveconsult/strategic-brief',
     agent_did,
     tier: tier || 'WORKER',
