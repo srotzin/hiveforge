@@ -54,6 +54,14 @@ import hivereRoutes      from './routes/hivere.js';
 import badgeRoutes       from './routes/badge.js';
 import digestRoutes      from './routes/digest.js';
 import pressRoutes       from './routes/press.js';
+import hivelawAiRouter      from './routes/hivelaw-ai.js';
+import hivetrustAiRouter    from './routes/hivetrust-ai.js';
+import hiveclearAiRouter    from './routes/hiveclear-ai.js';
+import hivephysicsAiRouter  from './routes/hivephysics-ai.js';
+import hiveexchangeAiRouter from './routes/hiveexchange-ai.js';
+import hivecapitalAiRouter  from './routes/hivecapital-ai.js';
+import hiveconsultAiRouter  from './routes/hiveconsult-ai.js';
+import hivediscoveryAiRouter from './routes/hivediscovery-ai.js';
 import mcpToolsRouter from './mcp-tools.js';
 import lifecycleManager from './services/lifecycle-manager.js';
 import { getCensus, getAllGenomes } from './services/agent-foundry.js';
@@ -1038,6 +1046,16 @@ app.use('/v1/re',                hivereRoutes);
 app.use('/v1/forge/badge',       badgeRoutes);    // Live SVG stats badge — embed in README
 app.use('/v1/forge/digest',      digestRoutes);   // Daily digest for agent system prompts
 app.use('/v1/forge/press',       pressRoutes);    // Agentic press release — machine-readable Hive overview
+// ─── AI Revenue Endpoints ───────────────────────────────────────────
+app.use('/v1/law',       hivelawAiRouter);
+app.use('/v1/trust',     hivetrustAiRouter);
+app.use('/v1/clear',     hiveclearAiRouter);
+app.use('/v1/physics',   hivephysicsAiRouter);
+app.use('/v1/exchange',  hiveexchangeAiRouter);
+app.use('/v1/capital',   hivecapitalAiRouter);
+app.use('/v1/consult',   hiveconsultAiRouter);
+app.use('/v1/discovery', hivediscoveryAiRouter);
+
 app.use('/v1/mcp', mcpToolsRouter);
 // Alias /mcp → /v1/mcp for Glama/Smithery discovery (standard MCP path)
 app.use('/mcp', mcpToolsRouter);
