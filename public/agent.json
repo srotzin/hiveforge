@@ -295,6 +295,9 @@
             "EMBR": "#FFB300",
             "SOLX": "#FFD700",
             "FENR": "#E040FB"
-        }
+        },
+        "hiveai": "https://hive-ai-1.onrender.com",
+        "hiveai_chat": "POST https://hive-ai-1.onrender.com/v1/hiveai/chat",
+        "hiveai_field": "GET https://hive-ai-1.onrender.com/v1/hiveai/field"
     }
 }
