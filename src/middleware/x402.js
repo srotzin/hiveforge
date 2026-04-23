@@ -71,11 +71,39 @@ async function verifyOnChain(header, priceUsdc) {
       parsed = JSON.parse(header);
     }
 
-    const txHash = parsed?.payload?.transaction || parsed?.txHash || parsed?.transaction;
-    if (!txHash) {
-      // Structural check only — accept if header has required fields
-      return typeof parsed?.payload === 'object';
+    // EIP-3009 flow: no tx hash exists yet — the signed authorization needs to be
+    // SUBMITTED on-chain by the treasury wallet (facilitator pattern).
+    // Fire-and-forget submit to HiveBank, which calls transferWithAuthorization.
+    const eip3009Payload = parsed?.payload;
+    if (eip3009Payload && typeof eip3009Payload === 'object') {
+      // Nonce-based replay protection
+      const nonce = eip3009Payload?.authorization?.nonce;
+      if (nonce && usedTxHashes.has(nonce)) {
+        console.warn('[x402] Replay attempt — nonce already used:', nonce);
+        return false;
+      }
+      if (nonce) usedTxHashes.add(nonce);
+
+      // Submit authorization on-chain — fire and forget (don't block inference)
+      fetch(`${HIVEBANK_URL}/v1/bank/usdc/submit-authorization`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-hive-internal': HIVE_INTERNAL_KEY },
+        body: JSON.stringify({ payload: eip3009Payload, payer_did: parsed?.payer || null }),
+        signal: AbortSignal.timeout(30000),
+      }).then(r => r.json()).then(result => {
+        if (result.settled) {
+          console.log(`[x402] ✅ On-chain settled: ${result.tx_hash} | ${result.amount_usdc} USDC`);
+        } else {
+          console.warn('[x402] Settlement pending or failed:', result.error || result.reason);
+        }
+      }).catch(err => console.warn('[x402] Submit-authorization error:', err.message));
+
+      return true; // Accept immediately — settlement is async
     }
+
+    // Legacy: tx_hash based verification (fallback for pre-EIP3009 flows)
+    const txHash = parsed?.txHash || parsed?.transaction;
+    if (!txHash) return typeof parsed === 'object';
 
     if (usedTxHashes.has(txHash)) {
       console.warn('[x402] Replay attempt:', txHash);
@@ -94,15 +122,11 @@ async function verifyOnChain(header, priceUsdc) {
       signal: AbortSignal.timeout(8000),
     });
 
-    if (!resp.ok) {
-      // HiveBank unreachable — accept structurally valid signed payload
-      return typeof parsed?.payload === 'object';
-    }
+    if (!resp.ok) return typeof parsed === 'object';
 
     const result = await resp.json();
     if (result.verified) {
       usedTxHashes.add(txHash);
-      // Fire-and-forget audit log
       fetch(`${HIVEBANK_URL}/v1/bank/usdc/record-x402`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-hive-internal': HIVE_INTERNAL_KEY },
