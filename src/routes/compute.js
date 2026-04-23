@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireDID } from '../middleware/auth.js';
 import { requirePayment } from '../middleware/x402.js';
 import { computeRouter } from '../services/compute-router.js';
+import { quotePrice, getAgentStats, getLeaderboard, getGlobalStats } from '../services/log-pricing.js';
 
 const router = Router();
 
@@ -34,8 +35,19 @@ router.post('/inference', requireDID, async (req, res) => {
       });
     }
 
-    // Dynamic x402 pricing — calculate price from request body
-    const priceUsdc = computeRouter.calculatePrice({ messages, max_tokens, model_preference, specific_model });
+    // Dynamic x402 pricing — calculate base price, then apply log multiplier
+    const basePrice = computeRouter.calculatePrice({ messages, max_tokens, model_preference, specific_model });
+    const agentDid  = req.did || req.headers['x-agent-did'] || 'did:hive:anonymous';
+    const quote     = quotePrice(agentDid, basePrice);
+    const priceUsdc = quote.quotedPrice;
+
+    // Emit tier-up event in response header so agents can track advancement
+    if (quote.tierUp) {
+      res.set('X-Hive-Tier', quote.tier);
+      res.set('X-Hive-Tier-Up', '1');
+    }
+    res.set('X-Hive-Calls', String(quote.calls));
+    res.set('X-Hive-Multiplier', String(quote.multiplier));
 
     // Apply payment middleware dynamically
     const paymentMiddleware = requirePayment(priceUsdc, 'HiveCompute Inference');
@@ -110,6 +122,30 @@ router.get('/models', (req, res) => {
 router.get('/stats', requireDID, (req, res) => {
   const result = computeRouter.getStats();
   return res.status(200).json(result);
+});
+
+/**
+ * GET /v1/compute/quote/:did — Get current log-pricing stats for an agent
+ * Shows multiplier, tier, calls to next tier. Free — agents should poll this.
+ */
+router.get('/quote/:did', (req, res) => {
+  const stats = getAgentStats(req.params.did);
+  return res.status(200).json({ success: true, ...stats });
+});
+
+/**
+ * GET /v1/compute/volume/leaderboard — Top agents by call volume
+ */
+router.get('/volume/leaderboard', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+  return res.status(200).json({ success: true, leaderboard: getLeaderboard(limit) });
+});
+
+/**
+ * GET /v1/compute/volume/global — Global stats across all agents
+ */
+router.get('/volume/global', (req, res) => {
+  return res.status(200).json({ success: true, ...getGlobalStats() });
 });
 
 export default router;
