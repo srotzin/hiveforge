@@ -5,7 +5,7 @@
  * Key fixes vs v1:
  *  - Header name: PAYMENT-REQUIRED (not X-PAYMENT-REQUIRED)
  *  - Body: x402Version: 1, accepts[] with correct V1 schema fields
- *  - network: CAIP-2 format "eip155:8453" (not "base")
+ *  - network: "base" (named format — x402 V1 SDK doesn't resolve CAIP-2 eip155:8453)
  *  - maxAmountRequired: atomic USDC units as string (6 decimals, e.g. "1000" = $0.001)
  *  - resource: full URL of the endpoint being paid for
  *  - maxTimeoutSeconds: 300
@@ -14,7 +14,7 @@
 
 const HIVE_RECIPIENT     = process.env.HOUSE_WALLET || '0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe';
 const HIVE_INTERNAL_KEY  = process.env.HIVE_INTERNAL_KEY || 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
-const HIVE_NETWORK_CAIP2 = 'eip155:8453';   // Base mainnet — CAIP-2 format required by SDK
+const HIVE_NETWORK_CAIP2 = 'base';   // Base mainnet — named format for x402 v1 SDK (eip155:8453 breaks V1)
 const USDC_CONTRACT      = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // USDC on Base
 const HIVEBANK_URL       = process.env.HIVEBANK_URL || 'https://hivebank.onrender.com';
 
