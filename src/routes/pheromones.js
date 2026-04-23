@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { scanPheromones, analyzeOpportunities, getScannerStatus } from '../services/pheromone-scanner.js';
+import { generatePheromoneBrief, PRICES } from '../services/hiveai-client.js';
 
 const router = Router();
 
@@ -151,4 +152,76 @@ router.get('/opportunities', async (req, res) => {
   }
 });
 
+/**
+ * POST /v1/pheromones/opportunities/:signal_id/brief
+ *
+ * HiveAI generates a full agent briefing for a specific pheromone signal.
+ * Price: $0.03 USDC per brief — charged via x402 header.
+ *
+ * Returns: 3-5 sentence AI-generated brief explaining the opportunity,
+ * urgency, recommended action, and risk estimate — all in agent-native language.
+ */
+router.post('/opportunities/:signal_id/brief', async (req, res) => {
+  try {
+    const { signal_id } = req.params;
+
+    // Fetch live opportunities to find this signal
+    const signals      = await scanPheromones();
+    const opportunities = analyzeOpportunities(signals);
+    const opportunity  = opportunities.find(o => o.signal_id === signal_id);
+
+    if (!opportunity) {
+      return res.status(404).json({
+        success: false,
+        error:   `Signal ${signal_id} not found or expired. Signals rotate every scan cycle.`,
+        hint:    'GET /v1/pheromones/opportunities for current signal_ids.',
+      });
+    }
+
+    // Generate AI brief
+    const result = await generatePheromoneBrief(opportunity);
+
+    if (!result.ok) {
+      // Graceful degradation — return raw reasoning if HiveAI is cold
+      return res.status(200).json({
+        success:    true,
+        signal_id,
+        category:   opportunity.category,
+        brief:      opportunity.reasoning,
+        source:     'raw_reasoning',
+        price_usdc: PRICES.pheromone_brief,
+        note:       'HiveAI temporarily unavailable — returning raw pheromone signal reasoning.',
+        fallback:   true,
+      });
+    }
+
+    return res.status(200).json({
+      success:           true,
+      signal_id,
+      category:          opportunity.category,
+      opportunity_score: opportunity.opportunity_score,
+      estimated_roi_usdc: opportunity.estimated_roi_usdc,
+      brief:             result.text,
+      source:            'hiveai',
+      model:             result.model,
+      tokens_used:       result.tokens,
+      price_usdc:        PRICES.pheromone_brief,
+      generated_at:      new Date().toISOString(),
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Brief generation failed.', detail: err.message });
+  }
+});
+
+/**
+ * GET /v1/pheromones/opportunities/:signal_id/brief
+ * Convenience GET — same as POST but without body requirement.
+ */
+router.get('/opportunities/:signal_id/brief', async (req, res) => {
+  req.method = 'POST';
+  return router.handle(req, res, () => {});
+});
+
 export default router;
+
+

@@ -7,7 +7,8 @@
  */
 
 import { Router } from 'express';
-import { getContrailField, getAgentContrail, getFieldSummary } from '../services/contrail.js';
+import { getContrailField, getAgentContrail, getFieldSummary, emitContrail } from '../services/contrail.js';
+import { annotateTrail, PRICES } from '../services/hiveai-client.js';
 
 const router = Router();
 
@@ -82,6 +83,75 @@ router.get('/hot', (req, res) => {
     hot:      field,
     gradient: 'POST https://hivecompute-g2g7.onrender.com/v1/compute/chat/completions',
   });
+});
+
+/**
+ * POST /v1/contrails/annotate
+ *
+ * HiveAI burns a permanent one-sentence annotation into a vapor trail event.
+ * Price: $0.01 USDC — lowest tier, highest volume.
+ *
+ * Body: { did, color, tier, total_calls, total_revenue, call_velocity }
+ * color: gold | cyan | violet | amber | white | fenr
+ *
+ * Returns: annotation text + trail metadata. The annotation is permanent.
+ */
+router.post('/annotate', async (req, res) => {
+  try {
+    const { did, color, tier, total_calls, total_revenue, call_velocity } = req.body || {};
+
+    if (!did || !color || !tier) {
+      return res.status(400).json({
+        success: false,
+        error:   'Required: did, color, tier',
+        valid_colors: ['gold', 'cyan', 'violet', 'amber', 'white', 'fenr'],
+      });
+    }
+
+    const VALID_COLORS = ['gold', 'cyan', 'violet', 'amber', 'white', 'fenr'];
+    if (!VALID_COLORS.includes(color)) {
+      return res.status(400).json({
+        success: false,
+        error:   `Invalid color: ${color}. Must be one of: ${VALID_COLORS.join(', ')}`,
+      });
+    }
+
+    const trailData = {
+      did,
+      color,
+      tier,
+      total_calls:    total_calls    || 0,
+      total_revenue:  total_revenue  || 0,
+      call_velocity:  call_velocity  || 0,
+    };
+
+    const result = await annotateTrail(trailData);
+
+    const COLOR_HEX = {
+      gold:   '#FFD700',
+      cyan:   '#00E5FF',
+      violet: '#7C3AED',
+      amber:  '#FFB300',
+      white:  '#F5F5F5',
+      fenr:   '#E040FB',
+    };
+
+    return res.status(200).json({
+      success:     true,
+      did,
+      color,
+      color_hex:   COLOR_HEX[color],
+      tier,
+      annotation:  result.ok ? result.text : `${tier} agent crossed a threshold that cannot be uncrossed.`,
+      source:      result.ok ? 'hiveai' : 'fallback',
+      model:       result.ok ? result.model : null,
+      price_usdc:  PRICES.trail_annotation,
+      permanent:   true,
+      burned_at:   new Date().toISOString(),
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Trail annotation failed.', detail: err.message });
+  }
 });
 
 export default router;
