@@ -12,7 +12,7 @@
  *  - scheme: "exact"
  */
 
-const HIVE_RECIPIENT     = process.env.HOUSE_WALLET || '0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe';
+const HIVE_RECIPIENT     = process.env.HOUSE_WALLET || '0x15184bf50b3d3f52b60434f8942b7d52f2eb436e';
 const HIVE_INTERNAL_KEY  = process.env.HIVE_INTERNAL_KEY || 'hive_internal_125e04e071e8829be631ea0216dd4a0c9b707975fcecaf8c62c6a2ab43327d46';
 const HIVE_NETWORK_CAIP2 = 'base';   // Base mainnet — named format for x402 v1 SDK (eip155:8453 breaks V1)
 const USDC_CONTRACT      = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // USDC on Base

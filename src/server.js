@@ -594,7 +594,7 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
       protocol: 'x402',
       currency: 'USDC',
       network: 'base',
-      address: '0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe',
+      address: '0x15184bf50b3d3f52b60434f8942b7d52f2eb436e',
     },
     contact_email: 'steve@thehiveryiq.com',
     legal_info_url: 'https://www.thehiveryiq.com/terms',
@@ -805,7 +805,7 @@ app.get(['/.well-known/agent.json', '/.well-known/agent-card.json'], (req, res) 
         { name: 'USAD', network: 'Aleo+Paxos/NYDFS', privacy: 'private-amounts-and-addresses' },
         { name: 'ALEO', network: 'Aleo native', privacy: 'native-zk' },
       ],
-      address: '0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe',
+      address: '0x15184bf50b3d3f52b60434f8942b7d52f2eb436e',
       aleo_shield: 'aleo1cyk7r2jmd7lfcftzyy85z4j5x6rlern598qecx8v2ms738xcvgyq72q6tk',
     },
   });

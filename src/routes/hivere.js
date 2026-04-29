@@ -22,7 +22,7 @@
  *   Advanced (valuation, portfolio):    $0.75 USDC
  *
  * All responses include EU AI Act Article 12 ATG audit record.
- * USDC recipient: 0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe
+ * USDC recipient: 0x15184bf50b3d3f52b60434f8942b7d52f2eb436e
  */
 
 import { Router } from 'express';
@@ -36,7 +36,7 @@ const router = Router();
 
 const SERVICE = 'HiveRE';
 const VERSION  = '1.0.0';
-const WALLET   = '0xE5588c407b6AdD3E83ce34190C77De20eaC1BeFe';
+const WALLET   = '0x15184bf50b3d3f52b60434f8942b7d52f2eb436e';
 
 function meta(payload) {
   return {
